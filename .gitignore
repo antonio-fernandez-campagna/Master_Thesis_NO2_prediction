@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and databases
+*.log
+db.sqlite3
+
+# Unit test / coverage reports
+.coverage
+htmlcov/
+*.cover
+*.py,cover
+
+# macOS files
+.DS_Store
+
+# VSCode settings
+.vscode/
+
+# MyPy cache
+.mypy_cache/
+
+notebooks/utils/cache/*
+
+notebooks/metheo/.cdsapirc
+
+data/raw/traffic/*
+data/processed/traffic_backup/*
+data/info/datos_trafico/09_2024.csv
+data/more_processed/air_data.csv
