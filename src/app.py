@@ -22,7 +22,6 @@ def main() -> None:
     st.session_state["map_2"], id_trafico_cercanos = crear_mapa_sensores_asignados_a_cada_no2()
     st.session_state["map_3"] = crear_mapa_sensores_asignados_a_cada_no2_continuo()
 
-
     # Uso de pestañas para organizar la visualización de los mapas
     st.subheader("Visualización de Mapas")
     tabs = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Mapa de NO2"])
