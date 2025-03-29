@@ -349,10 +349,9 @@ def mostrar_timelapse_como_video(df, time_groups, slider_format, global_min, glo
     """
     st.subheader("Generar Timelapse como Video/GIF")
 
-    col1, col2 = st.columns(2)
+    col1, _ = st.columns(2)
     with col1:
         modo = st.selectbox("Formato de salida", ["gif", "mp4"], index=0)
-    with col2:
         if st.button("Generar Timelapse"):
             st.info("Creando frames, por favor espera...")
 
@@ -391,6 +390,8 @@ def crear_mapa_no2():
         (df_original["fecha"].dt.date <= fecha_fin)
     ].copy()
     
+    
+    
     granularity = st.selectbox("Selecciona la granularidad", ["Horaria", "Mensual", "Anual"])
     if granularity == "Horaria":
         df["time_group"] = df["fecha"].dt.floor("H")
@@ -401,6 +402,8 @@ def crear_mapa_no2():
     else:  # Anual
         df["time_group"] = df["fecha"].dt.to_period("Y").dt.to_timestamp()
         slider_format = "%Y"
+        
+    
     
     if granularity in ["Mensual", "Anual"]:
         df = df.groupby(["time_group", "latitud", "longitud"]).agg(
