@@ -1,7 +1,11 @@
 import folium
 import pandas as pd
 import random
+
+from streamlit_folium import folium_static
+
 import streamlit as st
+import pandas as pd
 import numpy as np
 import folium
 import leafmap.foliumap as leafmap
@@ -13,53 +17,12 @@ from folium.plugins import HeatMap
 from streamlit_folium import folium_static
 import plotly.express as px
 import altair as alt
-import gc
-
-# Funciones de caché y limpieza
-@st.cache_data(ttl=3600)
-def cargar_datos_no2_locations():
-    """Carga y almacena en caché las ubicaciones de sensores NO2"""
-    return pd.read_csv('data/more_processed/no2_data_locations.csv')
-
-@st.cache_data(ttl=3600)
-def cargar_datos_traffic_locations():
-    """Carga y almacena en caché las ubicaciones de sensores de tráfico"""
-    return pd.read_csv('data/more_processed/traffic_data_locations_2024.csv')
-
-@st.cache_data(ttl=3600)
-def cargar_mapping_no2_traffic():
-    """Carga y almacena en caché el mapeo entre sensores NO2 y tráfico"""
-    return pd.read_csv('data/more_processed/mapping_no2_y_traffic_filtered_by_proximity.csv')
-
-@st.cache_data(ttl=3600)
-def cargar_datos_traffic():
-    """Carga datos de tráfico con caché"""
-    return pd.read_parquet('data/more_processed/traffic_data.parquet')
-
-@st.cache_data(ttl=3600)
-def cargar_datos_air():
-    """Carga y preprocesa los datos de aire con caché"""
-    df = pd.read_parquet('data/more_processed/air_data.parquet')
-    df['fecha'] = pd.to_datetime(df['fecha'])
-    return df
-
-def limpiar_cache():
-    """Limpia todo el caché de streamlit"""
-    cargar_datos_no2_locations.clear()
-    cargar_datos_traffic_locations.clear()
-    cargar_mapping_no2_traffic.clear()
-    cargar_datos_traffic.clear()
-    cargar_datos_air.clear()
-    crear_mapa_trafico_y_no2_all.clear()
-    crear_mapa_sensores_asignados_a_cada_no2.clear()
-    crear_mapa_sensores_asignados_a_cada_no2_continuo.clear()
-    gc.collect()  # Forzar recolección de basura
 
 # Function to create a simple example map
 def crear_mapa_trafico_y_no2_all():
-
-    no2_data_locations = cargar_datos_no2_locations()
-    traffic_data_locations = cargar_datos_traffic_locations()
+    
+    no2_data_locations = pd.read_csv('data/more_processed/no2_data_locations.csv')
+    traffic_data_locations = pd.read_csv('data/more_processed/traffic_data_locations_2024.csv')
     
     map_center = [no2_data_locations["latitud"].mean(), no2_data_locations["longitud"].mean()]
     m = folium.Map(location=map_center, zoom_start=11)
@@ -93,7 +56,8 @@ def crear_mapa_trafico_y_no2_all():
 
 def crear_mapa_sensores_asignados_a_cada_no2():
     
-    df = cargar_mapping_no2_traffic()
+    
+    df = pd.read_csv('data/more_processed/mapping_no2_y_traffic_filtered_by_proximity.csv')
 
     # Create a map centered around the average latitude and longitude
     map_center = [df['latitud_no2'].mean(), df['longitud_no2'].mean()]
@@ -124,6 +88,7 @@ def crear_mapa_sensores_asignados_a_cada_no2():
         ).add_to(m)
 
     # Add markers for Traffic data with the same color as the corresponding NO2 sensor
+    # Add markers for Traffic data with the same color as the corresponding NO2 sensor
     for _, row in df.iterrows():
         folium.Marker(
             location=[row['latitud_trafico'], row['longitud_trafico']],
@@ -141,8 +106,8 @@ def crear_mapa_sensores_asignados_a_cada_no2():
 
 def crear_mapa_sensores_asignados_a_cada_no2_continuo():
     
-    df = cargar_mapping_no2_traffic()
-
+    df = pd.read_csv('data/more_processed/mapping_no2_y_traffic_filtered_by_proximity.csv')
+    
     list_id_trafico_continuo = [5547, 5783, 5465, 5414, 5084, 4555, 4129, 3915, 3911]
     
     df = df[df['id_trafico'].isin(list_id_trafico_continuo)]
@@ -176,12 +141,13 @@ def crear_mapa_sensores_asignados_a_cada_no2_continuo():
         ).add_to(m)
 
     # Add markers for Traffic data with the same color as the corresponding NO2 sensor
+    # Add markers for Traffic data with the same color as the corresponding NO2 sensor
     for _, row in df.iterrows():
         folium.Marker(
             location=[row['latitud_trafico'], row['longitud_trafico']],
             popup=f"Traffic ID: {row['id_trafico']}, NO2 ID: {row['id_no2']}",
             icon=folium.DivIcon(
-                html=f'<div style="font-size: 10pt">🚦</div>'  
+                html=f'<div style="font-size: 10pt">🚦</div>'  # Use a small icon
             )
         ).add_to(m)
 
@@ -189,60 +155,58 @@ def crear_mapa_sensores_asignados_a_cada_no2_continuo():
     return m
 
 
-# Función para mostrar la continuidad de datos
 def mostrar_continuidad(sensor):
-    with st.spinner("Cargando datos de continuidad..."):
-        df = cargar_datos_traffic()
-        
-        # Filtrar y procesar solo los datos necesarios
-        df = df[df['id_trafico'] == str(sensor)].copy()
+    
+    import altair as alt
+    
+    df = pd.read_parquet('data/more_processed/traffic_data.parquet')
+    
+    df = df[df['id_trafico'] == str(sensor)]
 
-        # Asegurarse que la columna 'fecha' sea de tipo datetime
-        df['fecha'] = pd.to_datetime(df['fecha'])
-        
-        # Generar un rango horario completo
-        fecha_inicio = df['fecha'].min()
-        fecha_fin = df['fecha'].max()
-        
-        if fecha_inicio is not pd.NaT and fecha_fin is not pd.NaT:
-            rango_fechas = pd.date_range(start=fecha_inicio, end=fecha_fin, freq='H')
-            
-            # Crear DataFrame más eficiente solo con las columnas necesarias
-            df_full = pd.DataFrame({'fecha': rango_fechas})
-            # Usar merge en lugar de .isin() para mejor rendimiento
-            df_full['dato_presente'] = df_full['fecha'].isin(df['fecha']).astype(int)
-            
-            # Crear un gráfico con Altair
-            grafico = alt.Chart(df_full).mark_line(point=True).encode(
-                x=alt.X('fecha:T', title='Fecha y Hora'),
-                y=alt.Y('dato_presente:Q', 
-                        scale=alt.Scale(domain=[0, 1]),
-                        title='Presencia de datos (1: sí, 0: no)'),
-                tooltip=['fecha:T', 'dato_presente:Q']
-            ).properties(
-                title='Continuidad de datos en el tiempo'
-            )
-            
-            st.altair_chart(grafico, use_container_width=True)
-        else:
-            st.warning("No hay datos disponibles para este sensor.")
+    # Asegurarse que la columna 'fecha' sea de tipo datetime
+    df['fecha'] = pd.to_datetime(df['fecha'])
+    
+    # Generar un rango horario completo (cada hora) desde la fecha mínima a la máxima
+    fecha_inicio = df['fecha'].min()
+    fecha_fin = df['fecha'].max()
+    rango_fechas = pd.date_range(start=fecha_inicio, end=fecha_fin, freq='H')
+    
+    # Crear un DataFrame completo con el rango de fechas y marcar la presencia de datos
+    df_full = pd.DataFrame({'fecha': rango_fechas})
+    # True si la fecha existe en el dataset original, False en caso contrario
+    df_full['dato_presente'] = df_full['fecha'].isin(df['fecha'])
+    # Convertir a entero para graficar (1: presente, 0: faltante)
+    df_full['dato_presente'] = df_full['dato_presente'].astype(int)
+    
+    # Crear un gráfico con Altair
+    grafico = alt.Chart(df_full).mark_line(point=True).encode(
+        x=alt.X('fecha:T', title='Fecha y Hora'),
+        y=alt.Y('dato_presente:Q', 
+                scale=alt.Scale(domain=[0, 1]),
+                title='Presencia de datos (1: sí, 0: no)'),
+        tooltip=['fecha:T', 'dato_presente:Q']
+    ).properties(
+        title='Continuidad de datos en el tiempo'
+    )
+    
+    st.altair_chart(grafico, use_container_width=True)
 
 
-# @st.cache_data(ttl=3600, show_spinner=False)
-# def cargar_datos():
-#     """Carga y preprocesa los datos con caché para mejorar el rendimiento."""
-#     df = pd.read_parquet('data/more_processed/air_data.parquet')
-#     df['fecha'] = pd.to_datetime(df['fecha'])
-#     return df
+@st.cache_data(ttl=3600, show_spinner=False)
+def cargar_datos():
+    """Carga y preprocesa los datos con caché para mejorar el rendimiento."""
+    df = pd.read_parquet('data/more_processed/air_data.parquet')
+    df['fecha'] = pd.to_datetime(df['fecha'])
+    return df
 
-# Función para crear mapa de calor optimizado
 def crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_contaminacion=None):
-    """Crea un mapa Folium optimizado para reducir memoria"""
-    if df_selected.empty:
-        return None
-        
+    """
+    Crea un mapa Folium (usando leafmap) centrado en la media de las coordenadas.
+    """
     map_center = [df_selected["latitud"].mean(), df_selected["longitud"].mean()]
 
+    m = leafmap.Map(center=[map_center[0], map_center[1]], zoom=12)
+    
     m = leafmap.Map(
         center=map_center,
         zoom=12,
@@ -252,7 +216,11 @@ def crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_contaminac
         fullscreen_control=True
     )
     
-    # Personalizar datos según nivel de contaminación
+    
+    
+    print("1: ", df_selected.head())
+    
+    # Personalizar datos según nivel de contaminación si se especifica
     if nivel_contaminacion:
         if nivel_contaminacion == "Bajo":
             df_selected = df_selected[df_selected['no2_value'] <= 40]
@@ -260,29 +228,38 @@ def crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_contaminac
             df_selected = df_selected[(df_selected['no2_value'] > 40) & (df_selected['no2_value'] <= 100)]
         elif nivel_contaminacion == "Alto":
             df_selected = df_selected[df_selected['no2_value'] > 100]
+            
+    print("2: ", df_selected.head())
 
-    # Si hay demasiados puntos, muestrear para mejor rendimiento
-    max_points = 2000  # Limitar número de puntos para el heatmap
-    if len(df_selected) > max_points:
-        df_selected = df_selected.sample(max_points)
 
+    #Crear mapa de calor con parámetros optimizados
     if not df_selected.empty:
         # Configurar parámetros de heatmap según cantidad de datos
         radius = 15 if len(df_selected) > 100 else 25
         blur = 10 if len(df_selected) > 100 else 15
     
-        # Normalizar valores una sola vez y guardar como lista para evitar operaciones repetidas
-        heat_data = []
-        for _, row in df_selected.iterrows():
-            normalized_value = max(0.1, min(1, (row['no2_value'] - global_min) / (global_max - global_min) * 0.8 + 0.2))
-            heat_data.append([row['latitud'], row['longitud'], normalized_value])
+        
+        # Normalizar los valores para mejor visualización
+        heat_data = [[row['latitud'], row['longitud'], 
+                      max(0.1, min(1, (row['no2_value'] - global_min) / (global_max - global_min) * 0.8 + 0.2))] 
+                     for _, row in df_selected.iterrows()]
         
         m.add_heatmap(
             data=heat_data,
+            latitude="latitud",
+            longitude="longitud",
+            value="no2_value",  
             name="NO2 Heatmap",
             radius=radius,
             blur=blur,
         )
+        
+        # # Añadir leyenda
+        # m.add_legend(title="Niveles de NO₂", legend_dict={
+        #     "Bajo (<40 μg/m³)": "green",
+        #     "Medio (40-100 μg/m³)": "yellow",
+        #     "Alto (>100 μg/m³)": "red"
+        # })
     
     return m
 
@@ -442,7 +419,7 @@ def crear_mapa_no2():
     # Cargar datos
     with st.spinner('Cargando datos...'):
         try:
-            df_original = cargar_datos_air()
+            df_original = cargar_datos()
         except Exception as e:
             st.error(f"Error al cargar los datos: {str(e)}")
             st.info("Asegúrate de que el archivo 'data/more_processed/air_data.csv' existe y es accesible.")
