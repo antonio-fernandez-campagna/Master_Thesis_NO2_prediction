@@ -69,7 +69,6 @@ def analisis_sensores():
             
             # Opciones de visualización
             mostrar_correlacion = st.checkbox("Mostrar matriz de correlación", value=True)
-            tipo_grafico = st.radio("Tipo de gráfico", ["Líneas", "Dispersión"], horizontal=True)
         
         with col2:
             df_filtrado = df[(df["id_no2"] == sensor_seleccionado) & (df["fecha"].dt.date >= fecha_inicio) & (df["fecha"].dt.date <= fecha_fin)].copy()

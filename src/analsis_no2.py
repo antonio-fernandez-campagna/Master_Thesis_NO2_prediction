@@ -777,105 +777,9 @@ def mostrar_info_dashboard() -> None:
         """, unsafe_allow_html=True)
 
 
-def crear_controles_configuracion(
-    df_original: pd.DataFrame
-) -> Dict[str, Any]:
-    """
-    Crea los controles de configuración y devuelve los valores seleccionados.
-    
-    Args:
-        df_original: DataFrame con datos originales
-        
-    Returns:
-        Dict[str, Any]: Diccionario con los valores de configuración
-    """
-    # Obtener lista de sensores
-    sensores = ["Todos"] + sorted(df_original["id_no2"].unique())
-    
-    # Selector de sensor
-    sensor_seleccionado = st.selectbox(
-        "Selecciona un sensor de NO₂",
-        sensores,
-        index=0
-    )
-    
-    # Filtro de fechas
-    st.markdown("#### 📅 Rango de fechas")
-    fecha_min = df_original["fecha"].min().date()
-    fecha_max = df_original["fecha"].max().date()
-    fecha_inicio = st.date_input("Fecha inicial", fecha_min, min_value=fecha_min, max_value=fecha_max)
-    fecha_fin = st.date_input("Fecha final", fecha_max, min_value=fecha_min, max_value=fecha_max)
-    
-    # Validar fechas
-    if fecha_inicio > fecha_fin:
-        st.error("⚠️ La fecha inicial debe ser anterior a la fecha final")
-        fecha_fin = fecha_inicio + timedelta(days=7)
-    
-    # Granularidad y filtros
-    st.markdown("#### ⏱️ Agregación y filtro")
-    granularity = st.radio(
-        "Granularidad", 
-        ["Horaria", "Diaria", "Semanal", "Mensual", "Anual"],
-        index=3,  # Mensual por defecto
-        horizontal=True
-    )
-    nivel_contaminacion = st.selectbox("Nivel de contaminación", ["Todos", "Bajo", "Medio", "Alto"])
-    nivel_seleccionado = None if nivel_contaminacion == "Todos" else nivel_contaminacion
-    
-    # Opciones de visualización
-    st.markdown("#### 🔆 Opciones de visualización y timelapse")
-    show_stats = st.checkbox("Mostrar estadísticas", value=True)
-    filtrar_outliers = st.checkbox("Filtrar valores extremos (outliers)", value=False,
-                                  help="Elimina el 2% de valores más extremos para mejorar la visualización")
-    timelapse_format = st.radio("Formato de salida", ["gif", "mp4"], horizontal=True)
-    fps = st.slider("Velocidad (fps)", min_value=1, max_value=10, value=2)
-    
-    # Devolver configuración
-    return {
-        "sensor": sensor_seleccionado,
-        "fecha_inicio": fecha_inicio,
-        "fecha_fin": fecha_fin,
-        "granularity": granularity,
-        "nivel": nivel_seleccionado,
-        "show_stats": show_stats,
-        "filtrar_outliers": filtrar_outliers,
-        "timelapse_format": timelapse_format,
-        "fps": fps
-    }
 
 
-def crear_selector_tiempo(
-    time_groups: List[datetime], 
-    slider_format: str
-) -> datetime:
-    """
-    Crea un selector deslizante para elegir un momento temporal.
-    
-    Args:
-        time_groups: Lista de grupos temporales
-        slider_format: Formato para mostrar las fechas
-        
-    Returns:
-        datetime: Momento temporal seleccionado
-    """
-    slider_values = [
-        t.to_pydatetime() if hasattr(t, 'to_pydatetime') else t 
-        for t in time_groups
-    ]
-    
-    selected_time = st.select_slider(
-        "Selecciona el momento temporal",
-        options=slider_values,
-        format_func=lambda x: x.strftime(slider_format) if hasattr(x, 'strftime') else str(x),
-        value=slider_values[0]
-    )
-    
-    st.markdown(
-        f"📅 **Mostrando datos para:** "
-        f"{selected_time.strftime(slider_format) if hasattr(selected_time, 'strftime') else selected_time}"
-    )
-    
-    return selected_time
+
 
 
 def mostrar_seccion_timelapse(
@@ -1028,7 +932,16 @@ def generar_analisis_no2() -> None:
                 def on_sensor_change():
                     st.session_state.config["sensor"] = st.session_state.sensor_widget
                     st.session_state.need_reprocess = True
-                
+
+                    # Forzar actualización de todas las visualizaciones y estadísticas
+                    st.session_state.need_refresh_map = True
+                    st.session_state.need_refresh_hist = True
+
+                    # Limpiar caché de visualizaciones al cambiar el sensor
+                    for key in list(st.session_state.keys()):
+                        if key.startswith(("mapa_", "stats_", "estadisticas_", "histograma_")):
+                            del st.session_state[key]
+                                
                 sensor_seleccionado = st.selectbox(
                     "Selecciona un sensor de NO₂",
                     sensores,
