@@ -1331,7 +1331,6 @@ def generar_analisis_no2() -> None:
                                         
                                         # Aplicar filtro SOLO si está activado
                                         if st.session_state.config["filtrar_outliers"]:
-                                            print("filtrar_outliers entrando")
                                             df_stats = filtrar_outliers_para_visualizacion(df_stats)
                                         
                                         avg_no2, max_no2, nivel, color = calcular_estadisticas_no2(df_stats)
@@ -1361,10 +1360,6 @@ def generar_analisis_no2() -> None:
                     st.session_state[stats_key] = stats_df
                 else:
                     stats_df = st.session_state[stats_key]
-
-                print(stats_df.columns)
-                #print("stats_df['no2_value'].max()", stats_df['no2_value'].max())
-
                 
                 # Mostrar gráfico de evolución temporal
                 mostrar_grafico_evolucion_temporal(stats_df, slider_format)
@@ -1388,13 +1383,13 @@ def generar_analisis_no2() -> None:
                 st.error(f"Error al generar gráficos: {str(e)}")
 
         # Sección de timelapse con función modificada
-        mostrar_seccion_timelapse_con_callbacks(
-            df, 
-            time_groups, 
-            slider_format, 
-            global_min, 
-            global_max
-        )
+        # mostrar_seccion_timelapse_con_callbacks(
+        #     df, 
+        #     time_groups, 
+        #     slider_format, 
+        #     global_min, 
+        #     global_max
+        # )
 
         # Pie de página
         mostrar_pie_pagina(df_original["fecha"].max())
