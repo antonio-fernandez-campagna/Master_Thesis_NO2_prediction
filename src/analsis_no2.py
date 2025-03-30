@@ -380,7 +380,12 @@ def mostrar_histograma_no2(df: pd.DataFrame) -> None:
         color_media = "red"
     
     # Color para el máximo siempre es rojo
-    color_max = "red"
+    if max_value <= 40:
+        color_max = "green"
+    elif max_value <= 100:
+        color_max = "orange"
+    else:
+        color_max = "red"
     
     # Determinar rango adecuado para el eje X
     x_min = max(0, min_value * 0.9)
