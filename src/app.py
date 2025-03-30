@@ -18,6 +18,8 @@ from src.crear_mapas import (
     limpiar_cache
 )
 
+from src.analisis_sensores import analisis_sensores
+
 def main() -> None:
     """
     Función principal de la app.
@@ -28,7 +30,7 @@ def main() -> None:
     
     # Uso de pestañas para organizar la visualización de los mapas
     st.subheader("Visualización de Mapas")
-    tab1, tab2, tab3 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Mapa de NO2"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Mapa de NO2", "Análisis sensores de trafico"])
 
     # Solo cargar y renderizar el contenido de la pestaña activa
     with tab1:
@@ -81,6 +83,9 @@ def main() -> None:
 
     with tab3:
         crear_mapa_no2()
+
+    with tab4:
+        analisis_sensores()
 
 if __name__ == "__main__":
     main()

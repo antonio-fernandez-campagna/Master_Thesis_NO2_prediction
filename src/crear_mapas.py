@@ -189,6 +189,7 @@ def crear_mapa_sensores_asignados_a_cada_no2_continuo():
     return m
 
 
+
 # Función para mostrar la continuidad de datos
 def mostrar_continuidad(sensor):
     with st.spinner("Cargando datos de continuidad..."):
@@ -226,65 +227,6 @@ def mostrar_continuidad(sensor):
             st.altair_chart(grafico, use_container_width=True)
         else:
             st.warning("No hay datos disponibles para este sensor.")
-
-
-# @st.cache_data(ttl=3600, show_spinner=False)
-# def cargar_datos():
-#     """Carga y preprocesa los datos con caché para mejorar el rendimiento."""
-#     df = pd.read_parquet('data/more_processed/air_data.parquet')
-#     df['fecha'] = pd.to_datetime(df['fecha'])
-#     return df
-
-# Función para crear mapa de calor optimizado
-def crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_contaminacion=None):
-    """Crea un mapa Folium optimizado para reducir memoria"""
-    if df_selected.empty:
-        return None
-        
-    map_center = [df_selected["latitud"].mean(), df_selected["longitud"].mean()]
-
-    m = leafmap.Map(
-        center=map_center,
-        zoom=12,
-        tiles="CartoDB positron",
-        draw_control=False,
-        measure_control=False,
-        fullscreen_control=True
-    )
-    
-    # Personalizar datos según nivel de contaminación
-    if nivel_contaminacion:
-        if nivel_contaminacion == "Bajo":
-            df_selected = df_selected[df_selected['no2_value'] <= 40]
-        elif nivel_contaminacion == "Medio":
-            df_selected = df_selected[(df_selected['no2_value'] > 40) & (df_selected['no2_value'] <= 100)]
-        elif nivel_contaminacion == "Alto":
-            df_selected = df_selected[df_selected['no2_value'] > 100]
-
-    # Si hay demasiados puntos, muestrear para mejor rendimiento
-    max_points = 2000  # Limitar número de puntos para el heatmap
-    if len(df_selected) > max_points:
-        df_selected = df_selected.sample(max_points)
-
-    if not df_selected.empty:
-        # Configurar parámetros de heatmap según cantidad de datos
-        radius = 15 if len(df_selected) > 100 else 25
-        blur = 10 if len(df_selected) > 100 else 15
-    
-        # Normalizar valores una sola vez y guardar como lista para evitar operaciones repetidas
-        heat_data = []
-        for _, row in df_selected.iterrows():
-            normalized_value = max(0.1, min(1, (row['no2_value'] - global_min) / (global_max - global_min) * 0.8 + 0.2))
-            heat_data.append([row['latitud'], row['longitud'], normalized_value])
-        
-        m.add_heatmap(
-            data=heat_data,
-            name="NO2 Heatmap",
-            radius=radius,
-            blur=blur,
-        )
-    
-    return m
 
 def generar_timelapse(df, time_groups, slider_format, global_min, global_max, 
                       modo="gif", fps=2, nivel_contaminacion=None):
@@ -417,6 +359,59 @@ def generar_timelapse(df, time_groups, slider_format, global_min, global_max,
                         pass
 
 
+# Función para crear mapa de calor optimizado
+def crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_contaminacion=None):
+    """Crea un mapa Folium optimizado para reducir memoria"""
+    if df_selected.empty:
+        return None
+        
+    map_center = [df_selected["latitud"].mean(), df_selected["longitud"].mean()]
+
+    m = leafmap.Map(
+        center=map_center,
+        zoom=12,
+        tiles="CartoDB positron",
+        draw_control=False,
+        measure_control=False,
+        fullscreen_control=True
+    )
+    
+    # Personalizar datos según nivel de contaminación
+    if nivel_contaminacion:
+        if nivel_contaminacion == "Bajo":
+            df_selected = df_selected[df_selected['no2_value'] <= 40]
+        elif nivel_contaminacion == "Medio":
+            df_selected = df_selected[(df_selected['no2_value'] > 40) & (df_selected['no2_value'] <= 100)]
+        elif nivel_contaminacion == "Alto":
+            df_selected = df_selected[df_selected['no2_value'] > 100]
+
+    # Si hay demasiados puntos, muestrear para mejor rendimiento
+    max_points = 2000  # Limitar número de puntos para el heatmap
+    if len(df_selected) > max_points:
+        df_selected = df_selected.sample(max_points)
+
+    if not df_selected.empty:
+        # Configurar parámetros de heatmap según cantidad de datos
+        radius = 15 if len(df_selected) > 100 else 25
+        blur = 10 if len(df_selected) > 100 else 15
+    
+        # Normalizar valores una sola vez y guardar como lista para evitar operaciones repetidas
+        heat_data = []
+        for _, row in df_selected.iterrows():
+            normalized_value = max(0.1, min(1, (row['no2_value'] - global_min) / (global_max - global_min) * 0.8 + 0.2))
+            heat_data.append([row['latitud'], row['longitud'], normalized_value])
+        
+        m.add_heatmap(
+            data=heat_data,
+            name="NO2 Heatmap",
+            radius=radius,
+            blur=blur,
+        )
+    
+    return m
+
+
+
 def crear_mapa_no2():
     """Función principal para la visualización de datos de NO₂ en Madrid."""
 
@@ -439,258 +434,260 @@ def crear_mapa_no2():
         </div>
         """, unsafe_allow_html=True)
 
-    # Cargar datos
-    with st.spinner('Cargando datos...'):
-        try:
-            df_original = cargar_datos_air()
-        except Exception as e:
-            st.error(f"Error al cargar los datos: {str(e)}")
-            st.info("Asegúrate de que el archivo 'data/more_processed/air_data.csv' existe y es accesible.")
-            return
+    if st.button("Cargar datos de no2"):
 
-    # Obtener los valores mínimos y máximos globales para la normalización
-    global_min = df_original["no2_value"].min()
-    global_max = df_original["no2_value"].max()
-
-    # --- Controles de configuración (en lugar de st.sidebar, se incluyen en la página) ---
-    st.markdown('<div class="sub-header">⚙️ Configuración</div>', unsafe_allow_html=True)
-    with st.container():
-        col1, col2_main = st.columns([1, 3])
-        with col1:
-                        
-            # Obtener lista de sensores y agregar "Todos" al inicio
-            sensores = sorted(df_original["id_no2"].unique())
-            sensores = ["Todos"] + list(sensores)
-            
-            sensor_seleccionado = st.selectbox(
-                "Selecciona un sensor de NO₂",
-                sensores,
-                index=0  # Por defecto "Todos"
-            )
-            
-            if sensor_seleccionado != "Todos":
-                df_original = df_original[df_original["id_no2"] == sensor_seleccionado]
-            
-            # Filtro de fechas
-            st.markdown("#### 📅 Rango de fechas")
-            fecha_min = df_original["fecha"].min().date()
-            fecha_max = df_original["fecha"].max().date()
-            fecha_inicio = st.date_input("Fecha inicial", fecha_min, min_value=fecha_min, max_value=fecha_max)
-            fecha_fin = st.date_input("Fecha final", fecha_max, min_value=fecha_min, max_value=fecha_max)
-            if fecha_inicio > fecha_fin:
-                st.error("⚠️ La fecha inicial debe ser anterior a la fecha final")
-                fecha_fin = fecha_inicio + timedelta(days=7)
-                
-             # Granularidad temporal y filtro de nivel de contaminación
-            st.markdown("#### ⏱️ Agregación y filtro")
-            granularity = st.radio("Granularidad", ["Horaria", "Diaria", "Semanal", "Mensual", "Anual"], horizontal=True)
-            nivel_contaminacion = st.selectbox("Nivel de contaminación", ["Todos", "Bajo", "Medio", "Alto"])
-            nivel_seleccionado = None if nivel_contaminacion == "Todos" else nivel_contaminacion
-            
-            # Opciones de visualización adicionales en otra fila
-            st.markdown("#### 🔆 Opciones de visualización y timelapse")
-            # with st.container():
-            #     col1, col2 = st.columns(2)
-            #     with col1:
-            show_stats = st.checkbox("Mostrar estadísticas", value=True)
-                # with col2:
-            timelapse_format = st.radio("Formato de salida", ["gif", "mp4"], horizontal=True)
-            fps = st.slider("Velocidad (fps)", min_value=1, max_value=10, value=2)
-            
-        with col2_main:
-            
-            # --- Fin de los controles integrados ---
-
-            # Filtrar datos según el rango de fechas seleccionado
-            df = df_original[
-                (df_original["fecha"].dt.date >= fecha_inicio) & 
-                (df_original["fecha"].dt.date <= fecha_fin)
-            ].copy()
-            if df.empty:
-                st.error("⚠️ No hay datos disponibles para el rango de fechas seleccionado.")
-                return
-
-            # Configurar la granularidad temporal
-            if granularity == "Horaria":
-                df["time_group"] = df["fecha"].dt.floor("H")
-                slider_format = "%Y-%m-%d %H:%M"
-            elif granularity == "Diaria":
-                df["time_group"] = df["fecha"].dt.floor("D")
-                slider_format = "%Y-%m-%d"
-            elif granularity == "Semanal":
-                df["time_group"] = df["fecha"].dt.to_period("W").dt.to_timestamp()
-                slider_format = "%Y-%m-%d"
-            elif granularity == "Mensual":
-                df["time_group"] = df["fecha"].dt.to_period("M").dt.to_timestamp()
-                slider_format = "%Y-%m"
-            else:  # Anual
-                df["time_group"] = df["fecha"].dt.to_period("Y").dt.to_timestamp()
-                slider_format = "%Y"
-
-            if granularity != "Horaria":
-                df = df.groupby(["time_group", "latitud", "longitud"]).agg(
-                    no2_value=("no2_value", "mean"),
-                    fecha=("fecha", "min")
-                ).reset_index()
-
-            # Obtener los grupos de tiempo únicos
-            time_groups = sorted(df["time_group"].unique())
-            if len(time_groups) == 0:
-                st.error("⚠️ No hay suficientes datos para la granularidad seleccionada.")
-                return
-
-            st.markdown('<div class="sub-header">🗺️ Mapa de concentraciones de NO₂</div>', unsafe_allow_html=True)
-
-            # Slider para seleccionar el momento temporal
-            slider_values = [t.to_pydatetime() if hasattr(t, 'to_pydatetime') else t for t in time_groups]
-            selected_time = st.select_slider(
-                "Selecciona el momento temporal",
-                options=slider_values,
-                format_func=lambda x: x.strftime(slider_format) if hasattr(x, 'strftime') else str(x),
-                value=slider_values[0]
-            )
-            st.markdown(f"📅 **Mostrando datos para:** {selected_time.strftime(slider_format) if hasattr(selected_time, 'strftime') else selected_time}")
-
+        # Cargar datos
+        with st.spinner('Cargando datos...'):
             try:
-                if granularity == "Mensual":
-                    df_selected = df[df["time_group"].dt.to_period("M") == pd.Period(selected_time, "M")]
-                elif granularity == "Anual":
-                    df_selected = df[df["time_group"].dt.to_period("Y") == pd.Period(selected_time, "Y")]
-                elif granularity == "Semanal":
-                    df_selected = df[df["time_group"].dt.to_period("W") == pd.Period(selected_time, "W")]
-                else:
-                    df_selected = df[df["time_group"] == selected_time]
+                df_original = cargar_datos_air()
             except Exception as e:
-                st.error(f"Error al filtrar datos: {str(e)}")
-                df_selected = pd.DataFrame()
+                st.error(f"Error al cargar los datos: {str(e)}")
+                st.info("Asegúrate de que el archivo 'data/more_processed/air_data.csv' existe y es accesible.")
+                return
 
-            if not df_selected.empty:
+        # Obtener los valores mínimos y máximos globales para la normalización
+        global_min = df_original["no2_value"].min()
+        global_max = df_original["no2_value"].max()
+
+        # --- Controles de configuración (en lugar de st.sidebar, se incluyen en la página) ---
+        st.markdown('<div class="sub-header">⚙️ Configuración</div>', unsafe_allow_html=True)
+        with st.container():
+            col1, col2_main = st.columns([1, 3])
+            with col1:
+                            
+                # Obtener lista de sensores y agregar "Todos" al inicio
+                sensores = sorted(df_original["id_no2"].unique())
+                sensores = ["Todos"] + list(sensores)
                 
-                import streamlit.components.v1 as components
+                sensor_seleccionado = st.selectbox(
+                    "Selecciona un sensor de NO₂",
+                    sensores,
+                    index=0  # Por defecto "Todos"
+                )
+                
+                if sensor_seleccionado != "Todos":
+                    df_original = df_original[df_original["id_no2"] == sensor_seleccionado]
+                
+                # Filtro de fechas
+                st.markdown("#### 📅 Rango de fechas")
+                fecha_min = df_original["fecha"].min().date()
+                fecha_max = df_original["fecha"].max().date()
+                fecha_inicio = st.date_input("Fecha inicial", fecha_min, min_value=fecha_min, max_value=fecha_max)
+                fecha_fin = st.date_input("Fecha final", fecha_max, min_value=fecha_min, max_value=fecha_max)
+                if fecha_inicio > fecha_fin:
+                    st.error("⚠️ La fecha inicial debe ser anterior a la fecha final")
+                    fecha_fin = fecha_inicio + timedelta(days=7)
+                    
+                # Granularidad temporal y filtro de nivel de contaminación
+                st.markdown("#### ⏱️ Agregación y filtro")
+                granularity = st.radio("Granularidad", ["Horaria", "Diaria", "Semanal", "Mensual", "Anual"], horizontal=True)
+                nivel_contaminacion = st.selectbox("Nivel de contaminación", ["Todos", "Bajo", "Medio", "Alto"])
+                nivel_seleccionado = None if nivel_contaminacion == "Todos" else nivel_contaminacion
+                
+                # Opciones de visualización adicionales en otra fila
+                st.markdown("#### 🔆 Opciones de visualización y timelapse")
+                # with st.container():
+                #     col1, col2 = st.columns(2)
+                #     with col1:
+                show_stats = st.checkbox("Mostrar estadísticas", value=True)
+                    # with col2:
+                timelapse_format = st.radio("Formato de salida", ["gif", "mp4"], horizontal=True)
+                fps = st.slider("Velocidad (fps)", min_value=1, max_value=10, value=2)
+                
+            with col2_main:
+                
+                # --- Fin de los controles integrados ---
+
+                # Filtrar datos según el rango de fechas seleccionado
+                df = df_original[
+                    (df_original["fecha"].dt.date >= fecha_inicio) & 
+                    (df_original["fecha"].dt.date <= fecha_fin)
+                ].copy()
+                if df.empty:
+                    st.error("⚠️ No hay datos disponibles para el rango de fechas seleccionado.")
+                    return
+
+                # Configurar la granularidad temporal
+                if granularity == "Horaria":
+                    df["time_group"] = df["fecha"].dt.floor("H")
+                    slider_format = "%Y-%m-%d %H:%M"
+                elif granularity == "Diaria":
+                    df["time_group"] = df["fecha"].dt.floor("D")
+                    slider_format = "%Y-%m-%d"
+                elif granularity == "Semanal":
+                    df["time_group"] = df["fecha"].dt.to_period("W").dt.to_timestamp()
+                    slider_format = "%Y-%m-%d"
+                elif granularity == "Mensual":
+                    df["time_group"] = df["fecha"].dt.to_period("M").dt.to_timestamp()
+                    slider_format = "%Y-%m"
+                else:  # Anual
+                    df["time_group"] = df["fecha"].dt.to_period("Y").dt.to_timestamp()
+                    slider_format = "%Y"
+
+                if granularity != "Horaria":
+                    df = df.groupby(["time_group", "latitud", "longitud"]).agg(
+                        no2_value=("no2_value", "mean"),
+                        fecha=("fecha", "min")
+                    ).reset_index()
+
+                # Obtener los grupos de tiempo únicos
+                time_groups = sorted(df["time_group"].unique())
+                if len(time_groups) == 0:
+                    st.error("⚠️ No hay suficientes datos para la granularidad seleccionada.")
+                    return
+
+                st.markdown('<div class="sub-header">🗺️ Mapa de concentraciones de NO₂</div>', unsafe_allow_html=True)
+
+                # Slider para seleccionar el momento temporal
+                slider_values = [t.to_pydatetime() if hasattr(t, 'to_pydatetime') else t for t in time_groups]
+                selected_time = st.select_slider(
+                    "Selecciona el momento temporal",
+                    options=slider_values,
+                    format_func=lambda x: x.strftime(slider_format) if hasattr(x, 'strftime') else str(x),
+                    value=slider_values[0]
+                )
+                st.markdown(f"📅 **Mostrando datos para:** {selected_time.strftime(slider_format) if hasattr(selected_time, 'strftime') else selected_time}")
 
                 try:
-                    m = crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_seleccionado)
-                    if m:
-                        with st.container():
-                            col1, col2 = st.columns([4, 1])
-
-                            with col1:
-                                # Renderizar el mapa como un iframe para forzar que ocupe el ancho completo
-                                map_html = f"""
-                                <div style="width: 100%; height: 100%;">
-                                    {m._repr_html_()}
-                                </div>
-                                """
-                                components.html(map_html, height=600)
-                            
-                            with col2:
-                                avg_no2 = df_selected["no2_value"].mean()
-                                max_no2 = df_selected["no2_value"].max()
-                                if avg_no2 <= 40:
-                                    nivel = "Bajo"
-                                    color = "green"
-                                elif avg_no2 <= 100:
-                                    nivel = "Medio"
-                                    color = "orange"
-                                else:
-                                    nivel = "Alto"
-                                    color = "red"
-                                st.markdown(f"""
-                                    <div style="display: flex; flex-direction: column; align-items: center; margin-top: 1rem;">
-                                        <div style="text-align: center; padding: 0.5rem; background-color: #f0f0f0; border-radius: 0.5rem; width: 100%; margin-bottom: 0.5rem;">
-                                            <div style="font-size: 0.8rem; color: #666;">Media NO₂</div>
-                                            <div style="font-size: 1.5rem; color: {color};">{avg_no2:.1f} μg/m³</div>
-                                        </div>
-                                        <div style="text-align: center; padding: 0.5rem; background-color: #f0f0f0; border-radius: 0.5rem; width: 100%; margin-bottom: 0.5rem;">
-                                            <div style="font-size: 0.8rem; color: #666;">Máximo NO₂</div>
-                                            <div style="font-size: 1.5rem; color: red">{max_no2:.1f} μg/m³</div>
-                                        </div>
-                                        <div style="text-align: center; padding: 0.5rem; background-color: #f0f0f0; border-radius: 0.5rem; width: 100%;">
-                                            <div style="font-size: 0.8rem; color: #666;">Nivel</div>
-                                            <div style="font-size: 1.5rem; color: {color};">{nivel}</div>
-                                        </div>
-                                    </div>
-                                """, unsafe_allow_html=True)
-
-
+                    if granularity == "Mensual":
+                        df_selected = df[df["time_group"].dt.to_period("M") == pd.Period(selected_time, "M")]
+                    elif granularity == "Anual":
+                        df_selected = df[df["time_group"].dt.to_period("Y") == pd.Period(selected_time, "Y")]
+                    elif granularity == "Semanal":
+                        df_selected = df[df["time_group"].dt.to_period("W") == pd.Period(selected_time, "W")]
+                    else:
+                        df_selected = df[df["time_group"] == selected_time]
                 except Exception as e:
-                    st.error(f"Error al crear el mapa: {str(e)}")
-                    st.info("Intenta con un rango de fechas diferente o una granularidad distinta.")
-            else:
-                st.info("ℹ️ No hay datos disponibles para el momento seleccionado.")
+                    st.error(f"Error al filtrar datos: {str(e)}")
+                    df_selected = pd.DataFrame()
+
+                if not df_selected.empty:
+                    
+                    import streamlit.components.v1 as components
+
+                    try:
+                        m = crear_mapa_con_heatmap(df_selected, global_min, global_max, nivel_seleccionado)
+                        if m:
+                            with st.container():
+                                col1, col2 = st.columns([4, 1])
+
+                                with col1:
+                                    # Renderizar el mapa como un iframe para forzar que ocupe el ancho completo
+                                    map_html = f"""
+                                    <div style="width: 100%; height: 100%;">
+                                        {m._repr_html_()}
+                                    </div>
+                                    """
+                                    components.html(map_html, height=600)
+                                
+                                with col2:
+                                    avg_no2 = df_selected["no2_value"].mean()
+                                    max_no2 = df_selected["no2_value"].max()
+                                    if avg_no2 <= 40:
+                                        nivel = "Bajo"
+                                        color = "green"
+                                    elif avg_no2 <= 100:
+                                        nivel = "Medio"
+                                        color = "orange"
+                                    else:
+                                        nivel = "Alto"
+                                        color = "red"
+                                    st.markdown(f"""
+                                        <div style="display: flex; flex-direction: column; align-items: center; margin-top: 1rem;">
+                                            <div style="text-align: center; padding: 0.5rem; background-color: #f0f0f0; border-radius: 0.5rem; width: 100%; margin-bottom: 0.5rem;">
+                                                <div style="font-size: 0.8rem; color: #666;">Media NO₂</div>
+                                                <div style="font-size: 1.5rem; color: {color};">{avg_no2:.1f} μg/m³</div>
+                                            </div>
+                                            <div style="text-align: center; padding: 0.5rem; background-color: #f0f0f0; border-radius: 0.5rem; width: 100%; margin-bottom: 0.5rem;">
+                                                <div style="font-size: 0.8rem; color: #666;">Máximo NO₂</div>
+                                                <div style="font-size: 1.5rem; color: red">{max_no2:.1f} μg/m³</div>
+                                            </div>
+                                            <div style="text-align: center; padding: 0.5rem; background-color: #f0f0f0; border-radius: 0.5rem; width: 100%;">
+                                                <div style="font-size: 0.8rem; color: #666;">Nivel</div>
+                                                <div style="font-size: 1.5rem; color: {color};">{nivel}</div>
+                                            </div>
+                                        </div>
+                                    """, unsafe_allow_html=True)
 
 
-    st.markdown("## 📊 Estadísticas")    
-    
-    if show_stats and not df.empty:
-        try:
-            stats_df = df.groupby("time_group").agg(
-                no2_promedio=("no2_value", "mean"),
-                no2_max=("no2_value", "max"),
-                num_readings=("no2_value", "count")
-            ).reset_index()
-            
-            stats_df["fecha_str"] = stats_df["time_group"].dt.strftime(slider_format)
-            stats_df["time_group"] = pd.to_datetime(stats_df["time_group"])
-            
-            st.write("**Evolución temporal de NO₂**")
-            st.write("La OMS recomienda que los niveles medios anuales de NO₂ no superen los 40 μg/m³ (línea roja).")
-            line_chart = alt.Chart(stats_df).mark_line(point=True).encode(
-                x=alt.X('time_group:T', title='Fecha', axis=alt.Axis(format=slider_format)),
-                y=alt.Y('no2_promedio:Q', title='NO₂ promedio (μg/m³)'),
-                tooltip=[
-                    alt.Tooltip('fecha_str:N', title='Fecha'),
-                    alt.Tooltip('no2_promedio:Q', title='NO₂ promedio', format='.1f'),
-                    alt.Tooltip('no2_max:Q', title='NO₂ máximo', format='.1f'),
-                    alt.Tooltip('num_readings:Q', title='Nº de mediciones')
-                ]
-            ).properties(height=200)
-            
-            limit_line = alt.Chart(pd.DataFrame({'y': [40]})).mark_rule(color='red', strokeDash=[3, 3]).encode(y='y:Q')
-            st.altair_chart(line_chart + limit_line, use_container_width=True)
-            st.write("**Distribución de valores de NO₂**")
-            
-            hist = alt.Chart(df[(df["no2_value"] >= 0) & (df["no2_value"] <= 500)]).mark_bar().encode(
-                x=alt.X('no2_value:Q', bin=alt.Bin(maxbins=30), title='NO₂ (μg/m³)'),
-                y=alt.Y('count()', title='Frecuencia')
-            ).properties(height=150)
-            st.altair_chart(hist, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"Error al generar gráficos: {str(e)}")
-
-    st.markdown('<div class="sub-header">🎬 Timelapse de evolución temporal</div>', unsafe_allow_html=True)
-    col1, _ = st.columns([1, 2])
-    with col1:
-        if st.button("🎬 Generar Timelapse", key="generate_timelapse"):
-            try:
-                timelapse_data = generar_timelapse(
-                    df, time_groups, slider_format, global_min, global_max, 
-                    modo=timelapse_format, fps=fps, nivel_contaminacion=nivel_seleccionado
-                )
-                if timelapse_data:
-                    st.session_state.timelapse = timelapse_data
-                    st.session_state.timelapse_format = timelapse_format
-                    st.success("✅ Timelapse generado correctamente!")
+                    except Exception as e:
+                        st.error(f"Error al crear el mapa: {str(e)}")
+                        st.info("Intenta con un rango de fechas diferente o una granularidad distinta.")
                 else:
-                    st.error("❌ No se pudo generar el timelapse.")
+                    st.info("ℹ️ No hay datos disponibles para el momento seleccionado.")
+
+
+        st.markdown("## 📊 Estadísticas")    
+        
+        if show_stats and not df.empty:
+            try:
+                stats_df = df.groupby("time_group").agg(
+                    no2_promedio=("no2_value", "mean"),
+                    no2_max=("no2_value", "max"),
+                    num_readings=("no2_value", "count")
+                ).reset_index()
+                
+                stats_df["fecha_str"] = stats_df["time_group"].dt.strftime(slider_format)
+                stats_df["time_group"] = pd.to_datetime(stats_df["time_group"])
+                
+                st.write("**Evolución temporal de NO₂**")
+                st.write("La OMS recomienda que los niveles medios anuales de NO₂ no superen los 40 μg/m³ (línea roja).")
+                line_chart = alt.Chart(stats_df).mark_line(point=True).encode(
+                    x=alt.X('time_group:T', title='Fecha', axis=alt.Axis(format=slider_format)),
+                    y=alt.Y('no2_promedio:Q', title='NO₂ promedio (μg/m³)'),
+                    tooltip=[
+                        alt.Tooltip('fecha_str:N', title='Fecha'),
+                        alt.Tooltip('no2_promedio:Q', title='NO₂ promedio', format='.1f'),
+                        alt.Tooltip('no2_max:Q', title='NO₂ máximo', format='.1f'),
+                        alt.Tooltip('num_readings:Q', title='Nº de mediciones')
+                    ]
+                ).properties(height=200)
+                
+                limit_line = alt.Chart(pd.DataFrame({'y': [40]})).mark_rule(color='red', strokeDash=[3, 3]).encode(y='y:Q')
+                st.altair_chart(line_chart + limit_line, use_container_width=True)
+                st.write("**Distribución de valores de NO₂**")
+                
+                hist = alt.Chart(df[(df["no2_value"] >= 0) & (df["no2_value"] <= 500)]).mark_bar().encode(
+                    x=alt.X('no2_value:Q', bin=alt.Bin(maxbins=30), title='NO₂ (μg/m³)'),
+                    y=alt.Y('count()', title='Frecuencia')
+                ).properties(height=150)
+                st.altair_chart(hist, use_container_width=True)
+                
             except Exception as e:
-                st.error(f"Error al generar timelapse: {str(e)}")
-                st.info("Asegúrate de tener instaladas las dependencias necesarias (Selenium o imgkit).")
+                st.error(f"Error al generar gráficos: {str(e)}")
 
-        if 'timelapse' in st.session_state and st.session_state.timelapse:
-            filename = f"timelapse_no2_{fecha_inicio}_{fecha_fin}.{st.session_state.timelapse_format}"
-            st.download_button(
-                label=f"⬇️ Descargar {st.session_state.timelapse_format.upper()}",
-                data=st.session_state.timelapse,
-                file_name=filename,
-                mime="image/gif" if st.session_state.timelapse_format == "gif" else "video/mp4"
-            )
-        else:
-            st.info("Haz clic en 'Generar Timelapse' para crear una visualización animada de la evolución de NO₂ en el tiempo.")
+        st.markdown('<div class="sub-header">🎬 Timelapse de evolución temporal</div>', unsafe_allow_html=True)
+        col1, _ = st.columns([1, 2])
+        with col1:
+            if st.button("🎬 Generar Timelapse", key="generate_timelapse"):
+                try:
+                    timelapse_data = generar_timelapse(
+                        df, time_groups, slider_format, global_min, global_max, 
+                        modo=timelapse_format, fps=fps, nivel_contaminacion=nivel_seleccionado
+                    )
+                    if timelapse_data:
+                        st.session_state.timelapse = timelapse_data
+                        st.session_state.timelapse_format = timelapse_format
+                        st.success("✅ Timelapse generado correctamente!")
+                    else:
+                        st.error("❌ No se pudo generar el timelapse.")
+                except Exception as e:
+                    st.error(f"Error al generar timelapse: {str(e)}")
+                    st.info("Asegúrate de tener instaladas las dependencias necesarias (Selenium o imgkit).")
 
-    st.markdown("""
-    <div style="margin-top: 2rem; text-align: center; color: #666; font-size: 0.8rem;">
-        Datos proporcionados por el Ayuntamiento de Madrid. Última actualización: {}.
-    </div>
-    """.format(df_original["fecha"].max().strftime("%d/%m/%Y")), unsafe_allow_html=True)
+            if 'timelapse' in st.session_state and st.session_state.timelapse:
+                filename = f"timelapse_no2_{fecha_inicio}_{fecha_fin}.{st.session_state.timelapse_format}"
+                st.download_button(
+                    label=f"⬇️ Descargar {st.session_state.timelapse_format.upper()}",
+                    data=st.session_state.timelapse,
+                    file_name=filename,
+                    mime="image/gif" if st.session_state.timelapse_format == "gif" else "video/mp4"
+                )
+            else:
+                st.info("Haz clic en 'Generar Timelapse' para crear una visualización animada de la evolución de NO₂ en el tiempo.")
+
+        st.markdown("""
+        <div style="margin-top: 2rem; text-align: center; color: #666; font-size: 0.8rem;">
+            Datos proporcionados por el Ayuntamiento de Madrid. Última actualización: {}.
+        </div>
+        """.format(df_original["fecha"].max().strftime("%d/%m/%Y")), unsafe_allow_html=True)
