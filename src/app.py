@@ -19,7 +19,7 @@ from mapa_asignaciones_trafico_y_no2 import (
 from src.analsis_no2 import generar_analisis_no2
 from mapa_inicial_trafico_y_no2 import crear_mapa_trafico_y_no2_inicial
 
-from src.analisis_sensores import analisis_sensores
+from analisis_sensores_no2_y_trafico import analisis_sensores
 
 def main() -> None:
     """
