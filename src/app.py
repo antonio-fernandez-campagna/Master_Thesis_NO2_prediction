@@ -9,14 +9,15 @@ import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 pd.options.display.float_format = "{:.2f}".format
 
-from src.crear_mapas import (
-    crear_mapa_trafico_y_no2_all,
+from mapa_asignaciones_trafico_y_no2 import (
     crear_mapa_sensores_asignados_a_cada_no2,
-    crear_mapa_no2,
     crear_mapa_sensores_asignados_a_cada_no2_continuo,
     mostrar_continuidad,
-    limpiar_cache
+    #limpiar_cache
 )
+
+from src.analsis_no2 import generar_analisis_no2
+from mapa_inicial_trafico_y_no2 import crear_mapa_trafico_y_no2_inicial
 
 from src.analisis_sensores import analisis_sensores
 
@@ -30,13 +31,13 @@ def main() -> None:
     
     # Uso de pestañas para organizar la visualización de los mapas
     st.subheader("Visualización de Mapas")
-    tab1, tab2, tab3, tab4 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Mapa de NO2", "Análisis sensores de trafico"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Análisis de NO2", "Análisis sensores de trafico"])
 
     # Solo cargar y renderizar el contenido de la pestaña activa
     with tab1:
         if st.button("Cargar mapa de NO2 y Tráfico", key="load_map1"):
             with st.spinner("Cargando mapa..."):
-                st.session_state["map_1"] = crear_mapa_trafico_y_no2_all()
+                st.session_state["map_1"] = crear_mapa_trafico_y_no2_inicial()
         
         if "map_1" in st.session_state:
             st.write("### Mapa NO2 y Tráfico")
@@ -82,7 +83,7 @@ def main() -> None:
                 mostrar_continuidad(sensor)
 
     with tab3:
-        crear_mapa_no2()
+        generar_analisis_no2()
 
     with tab4:
         analisis_sensores()
