@@ -20,8 +20,6 @@ from datetime import datetime, timedelta
 from folium.plugins import HeatMap
 from streamlit_folium import folium_static
 import altair as alt
-import matplotlib.pyplot as plt
-from statsmodels.tsa.seasonal import seasonal_decompose
 
 
 # -------------------- FUNCIONES DE CARGA Y PREPROCESAMIENTO DE DATOS --------------------
@@ -348,45 +346,6 @@ def mostrar_grafico_evolucion_temporal(stats_df: pd.DataFrame, slider_format: st
     
     # Mostrar gráfico
     st.altair_chart(line_chart + limit_line, use_container_width=True)
-
-
-def mostrar_descomposicion_serie_temporal(stats_df: pd.DataFrame, slider_format: str) -> None:
-    """
-    Muestra la descomposición estacional de la serie temporal de NO2.
-
-    Args:
-        stats_df: DataFrame con estadísticas temporales.
-        slider_format: Formato para mostrar las fechas.
-    """
-
-    st.markdown("### 📊 Descomposición de la serie temporal de NO₂")
-    st.write("**Descomposición estacional de la serie temporal de NO₂**")
-    
-    # Asegurar que los datos están indexados por fecha
-    df = stats_df.copy()
-    df.set_index('time_group', inplace=True)
-    
-    # Aplicar descomposición estacional
-    # Determinar el periodo basado en el formato del slider
-    if slider_format == "%Y-%m":
-        period = 12  # Mensual
-    elif slider_format == "%Y-%m-%d":
-        period = 365  # Diario
-    else:
-        period = 7  # Semanal o cualquier otro caso
-
-    # Aplicar descomposición estacional
-    result = seasonal_decompose(df['no2_promedio'], model='additive', period=period)
-    
-    # Graficar resultados
-    fig, axes = plt.subplots(4, 1, figsize=(12, 8), sharex=True)
-    result.observed.plot(ax=axes[0], title="Serie Original", color="black")
-    result.trend.plot(ax=axes[1], title="Tendencia", color="blue")
-    result.seasonal.plot(ax=axes[2], title="Estacionalidad", color="green")
-    result.resid.plot(ax=axes[3], title="Ruido (Residuos)", color="red")
-    
-    plt.tight_layout()
-    st.pyplot(fig)
 
 
 def mostrar_histograma_no2(df: pd.DataFrame) -> None:
@@ -816,6 +775,11 @@ def mostrar_info_dashboard() -> None:
         <p><strong>Nota:</strong> El NO₂ es un contaminante asociado principalmente al tráfico rodado. La OMS recomienda no superar los 40 μg/m³ de media anual.</p>
         </div>
         """, unsafe_allow_html=True)
+
+
+
+
+
 
 
 def mostrar_seccion_timelapse(
@@ -1319,14 +1283,7 @@ def generar_analisis_no2() -> None:
                 
                 # Mostrar gráfico de evolución temporal
                 mostrar_grafico_evolucion_temporal(stats_df, slider_format)
-
-                try:
-                    st.write(stats_df.head())
-                    mostrar_descomposicion_serie_temporal(stats_df, slider_format)
-                except Exception as e:
-                    st.error(f"Error al mostrar la descomposición de la serie temporal: {str(e)}")
-                    st.info("No se puede mostrar la descomposición de la serie temporal. Se deben tener dos ciclos completos de datos. Intenta con un rango de fechas diferente o una granularidad distinta.")
-
+                
                 # Gráfico del histograma
                 hist_key = f"histograma_{st.session_state.config['filtrar_outliers']}"
                 
@@ -1344,6 +1301,15 @@ def generar_analisis_no2() -> None:
                 
             except Exception as e:
                 st.error(f"Error al generar gráficos: {str(e)}")
+
+        # Sección de timelapse con función modificada
+        # mostrar_seccion_timelapse_con_callbacks(
+        #     df, 
+        #     time_groups, 
+        #     slider_format, 
+        #     global_min, 
+        #     global_max
+        # )
 
         # Pie de página
         mostrar_pie_pagina(df_original["fecha"].max())

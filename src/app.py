@@ -26,24 +26,24 @@ def main() -> None:
     Función principal de la app.
     """
     st.set_page_config(page_title="NO2 Sensors Map", layout="wide")
-    st.title("NO2 Sensors Map")
+    st.title("Análisis del NO2 en relación al tráfico y meteorología")
     
     
     # Uso de pestañas para organizar la visualización de los mapas
     st.subheader("Visualización de Mapas")
-    tab1, tab2, tab3, tab4 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Análisis de NO2", "Análisis sensores de trafico"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Análisis de NO2", "Análisis sensores de trafico + meteorología + NO2"])
 
     # Solo cargar y renderizar el contenido de la pestaña activa
     with tab1:
         if st.button("Cargar mapa de NO2 y Tráfico", key="load_map1"):
             with st.spinner("Cargando mapa..."):
-                st.session_state["map_1"] = crear_mapa_trafico_y_no2_inicial()
+                crear_mapa_trafico_y_no2_inicial()
         
-        if "map_1" in st.session_state:
-            st.write("### Mapa NO2 y Tráfico")
-            folium_static(st.session_state["map_1"])
-        else:
-            st.info("Haz clic en el botón para cargar el mapa NO2 + Tráfico.")
+        # if "map_1" in st.session_state:
+        #     st.write("### Mapa NO2 y Tráfico")
+        #     folium_static(st.session_state["map_1"])
+        # else:
+        #     st.info("Haz clic en el botón para cargar el mapa NO2 + Tráfico.")
 
     with tab2:
         col1, col2 = st.columns([1, 1])
@@ -54,7 +54,7 @@ def main() -> None:
                     st.session_state["map_2"], st.session_state["id_trafico_cercanos"] = crear_mapa_sensores_asignados_a_cada_no2()
             
             if "map_2" in st.session_state:
-                st.write("### Mapa de asignaciones NO2 y sensores de tráfico")
+                st.write("### Mapa de asignaciones NO2 y sensores de tráfico con menor distancia")
                 st.write("Estos sensores han sido filtrados por estar a una distancia máxima de 200m")
                 folium_static(st.session_state["map_2"])
             else:

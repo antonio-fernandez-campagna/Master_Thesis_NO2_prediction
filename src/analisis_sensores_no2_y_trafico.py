@@ -231,7 +231,8 @@ def analisis_sensores():
             granularity = st.radio(
                 "Granularidad temporal", 
                 ["Horaria", "Diaria", "Semanal", "Mensual"], 
-                horizontal=True
+                horizontal=True,
+                index=3
             )
         
         with col2:
@@ -245,7 +246,7 @@ def analisis_sensores():
             variables_seleccionadas = st.multiselect(
                 "Variables a comparar con NO₂", 
                 variables_disponibles, 
-                default=variables_disponibles
+                default=variables_disponibles[:4]
             )
     
     # ---------- Filtrado y procesamiento de datos ----------
