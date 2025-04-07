@@ -1321,7 +1321,6 @@ def generar_analisis_no2() -> None:
                 mostrar_grafico_evolucion_temporal(stats_df, slider_format)
 
                 try:
-                    st.write(stats_df.head())
                     mostrar_descomposicion_serie_temporal(stats_df, slider_format)
                 except Exception as e:
                     st.error(f"Error al mostrar la descomposición de la serie temporal: {str(e)}")

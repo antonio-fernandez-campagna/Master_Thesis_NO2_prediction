@@ -17,9 +17,9 @@ from mapa_asignaciones_trafico_y_no2 import (
 )
 
 from src.analsis_no2 import generar_analisis_no2
-from mapa_inicial_trafico_y_no2 import crear_mapa_trafico_y_no2_inicial
-
-from analisis_sensores_no2_y_trafico import analisis_sensores
+from training import training_page
+from src.mapa_inicial_trafico_y_no2 import crear_mapa_trafico_y_no2_inicial
+from src.analisis_sensores_no2_y_trafico import analisis_sensores
 
 def main() -> None:
     """
@@ -31,7 +31,7 @@ def main() -> None:
     
     # Uso de pestañas para organizar la visualización de los mapas
     st.subheader("Visualización de Mapas")
-    tab1, tab2, tab3, tab4 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Análisis de NO2", "Análisis sensores de trafico + meteorología + NO2"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Análisis de NO2", "Análisis sensores de trafico + meteorología + NO2", "Entrenamiento del modelo"])
 
     # Solo cargar y renderizar el contenido de la pestaña activa
     with tab1:
@@ -87,6 +87,9 @@ def main() -> None:
 
     with tab4:
         analisis_sensores()
+
+    with tab5:
+        training_page()
 
 if __name__ == "__main__":
     main()
