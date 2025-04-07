@@ -12,6 +12,7 @@ from pygam import LinearGAM, s, f, te
 from sklearn.model_selection import train_test_split
 import statsmodels.api as sm
 from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler
 
 
 # ==========================================
@@ -132,29 +133,66 @@ def filter_outliers(df: pd.DataFrame, method: str = 'iqr') -> pd.DataFrame:
         raise ValueError(f"Método '{method}' no reconocido. Usa: 'iqr', 'zscore' o 'quantiles'.")
     
 def convertir_unidades_legibles(df):
+    """
+    Convierte las variables meteorológicas del ERA5 a unidades más interpretables.
+    
+    Conversiones:
+    - Temperaturas: Kelvin a Celsius
+    - Radiación: J/m² a W/m²
+    - Viento: m/s a km/h
+    - Presión: Pa a hPa
+    - Precipitación: m a mm
+    """
     df = df.copy()
-    df['d2m'] = df['d2m'] - 273.15       # Kelvin a °C
-    df['t2m'] = df['t2m'] - 273.15
-    df['ssr'] = df['ssr'] / 3600         # J/m² a W/m² (si es por hora)
-    df['ssrd'] = df['ssrd'] / 3600
-    df['u10'] = df['u10'] * 3.6          # m/s a km/h
-    df['v10'] = df['v10'] * 3.6
-    df['sp'] = df['sp'] / 100            # Pa a hPa
-    df['tp'] = df['tp'] * 1000           # m a mm
+    
+    # Temperatura y punto de rocío (K -> °C)
+    df['d2m'] = df['d2m'] - 273.15  # Punto de rocío a 2m
+    df['t2m'] = df['t2m'] - 273.15  # Temperatura a 2m
+    
+    # Radiación solar (J/m² -> W/m²)
+    df['ssr'] = df['ssr'] / 3600    # Radiación de onda corta neta
+    df['ssrd'] = df['ssrd'] / 3600  # Radiación de onda corta descendente
+    
+    # Componentes del viento (m/s -> km/h)
+    df['u10'] = df['u10'] * 3.6     # Componente U del viento a 10m
+    df['v10'] = df['v10'] * 3.6     # Componente V del viento a 10m
+    
+    # Calcular velocidad y dirección del viento
+    df['wind_speed'] = np.sqrt(df['u10']**2 + df['v10']**2)
+    df['wind_direction'] = (270 - np.arctan2(df['v10'], df['u10']) * 180/np.pi) % 360
+    
+    # Presión superficial (Pa -> hPa)
+    df['sp'] = df['sp'] / 100
+    
+    # Precipitación (m -> mm)
+    df['tp'] = df['tp'] * 1000
+    
     return df
 
-from sklearn.preprocessing import StandardScaler
+# Añadir un diccionario con metadatos de las variables
+VARIABLE_METADATA = {
+    'd2m': {'name': 'Punto de Rocío', 'unit': '°C', 'typical_range': (-10, 30)},
+    't2m': {'name': 'Temperatura', 'unit': '°C', 'typical_range': (-5, 40)},
+    'ssr': {'name': 'Radiación Solar Neta', 'unit': 'W/m²', 'typical_range': (0, 1000)},
+    'ssrd': {'name': 'Radiación Solar Descendente', 'unit': 'W/m²', 'typical_range': (0, 1000)},
+    'wind_speed': {'name': 'Velocidad del Viento', 'unit': 'km/h', 'typical_range': (0, 100)},
+    'wind_direction': {'name': 'Dirección del Viento', 'unit': '°', 'typical_range': (0, 360)},
+    'sp': {'name': 'Presión Superficial', 'unit': 'hPa', 'typical_range': (980, 1030)},
+    'tp': {'name': 'Precipitación Total', 'unit': 'mm', 'typical_range': (0, 50)}
+}
 
-def estandarizar_variables(df, columnas, scaler_dict=None):
+def estandarizar_variables(df, columnas):
+    """
+    Estandariza las variables seleccionadas y guarda los parámetros de escalado.
+    """
     df = df.copy()
-    if scaler_dict is None:
-        scaler_dict = {}
-
+    scaler_dict = {}
+    
     for col in columnas:
         scaler = StandardScaler()
         df[col] = scaler.fit_transform(df[[col]])
         scaler_dict[col] = scaler
-
+        
     return df, scaler_dict
 
 def desescalar_variables(df, scaler_dict):
@@ -163,23 +201,23 @@ def desescalar_variables(df, scaler_dict):
         df[col] = scaler.inverse_transform(df[[col]])
     return df
 
+def escalar_target(y):
+    """
+    Escala la variable objetivo y devuelve el scaler para posterior uso.
+    """
+    scaler = StandardScaler()
+    y_scaled = scaler.fit_transform(y.values.reshape(-1, 1)).ravel()
+    return y_scaled, scaler
+
 
 # ==========================================
 # ENTRENAMIENTO DEL MODELO
 # ==========================================
 
-def gam_train(X_train, y_train, feature_names, sensor_seleccionado, outlier_type, preprocessing_box):
+def gam_train(X_train, y_train, feature_names, sensor_seleccionado, outlier_type, preprocessing_box, scaler_dict, scaler_target):
     """
-    Entrenamiento del modelo GAM con variables de tráfico y meteorológicas.
-    
-    Args:
-        end_train_date (str): Fecha límite para datos de entrenamiento.
-        start_test_date (str): Fecha inicio para datos de prueba.
-    
-    Returns:
-        None: Guarda el modelo entrenado en disco.
+    Entrenamiento del modelo GAM con variables escaladas.
     """
-
     # Crear modelo GAM con splines para cada variable
     # s() indica que se usará una función suave (spline) para modelar la relación
     gam = LinearGAM(
@@ -207,9 +245,17 @@ def gam_train(X_train, y_train, feature_names, sensor_seleccionado, outlier_type
 
     print("Modelo entrenado correctamente")
 
-    # Guardar modelo con fecha y hora actual
-    file_name = f'data/models/gam_model_{sensor_seleccionado}_{outlier_type}_{preprocessing_box}.pkl'  
-    joblib.dump(gam, file_name)
+    # Guardar modelo y scalers juntos
+    model_info = {
+        'model': gam,
+        'feature_names': feature_names,
+        'scaler_dict': scaler_dict,
+        'scaler_target': scaler_target,
+        'variable_metadata': VARIABLE_METADATA
+    }
+    
+    file_name = f'data/models/gam_model_{sensor_seleccionado}_{outlier_type}_{preprocessing_box}.pkl'
+    joblib.dump(model_info, file_name)
     print(f"Modelo guardado en {file_name}")
 
 
@@ -335,26 +381,30 @@ def get_partial_effects(model, feature_names, values, sin_name=None, cos_name=No
     return effects
 
 
-def plot_effect(x_vals, y_vals, title, xlabel, ylabel, xticks=None):
+def plot_effect(x_vals, y_vals, title, xlabel, ylabel, feature_name=None, xticks=None):
     """
-    Función auxiliar para graficar efectos.
-    
-    Args:
-        x_vals: Valores del eje X.
-        y_vals: Valores del eje Y (efectos).
-        title (str): Título del gráfico.
-        xlabel (str): Etiqueta del eje X.
-        ylabel (str): Etiqueta del eje Y.
-        xticks (list, optional): Valores para mostrar en el eje X.
+    Función mejorada para graficar efectos con unidades correctas.
     """
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(x_vals, y_vals)
+    
+    if feature_name in VARIABLE_METADATA:
+        metadata = VARIABLE_METADATA[feature_name]
+        xlabel = f"{metadata['name']} ({metadata['unit']})"
+    
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if xticks is not None:
         ax.set_xticks(xticks)
     ax.grid(True)
+    
+    # Añadir información sobre el rango típico si está disponible
+    if feature_name in VARIABLE_METADATA:
+        range_min, range_max = VARIABLE_METADATA[feature_name]['typical_range']
+        ax.axvspan(range_min, range_max, alpha=0.1, color='green', label='Rango típico')
+        ax.legend()
+    
     st.pyplot(fig)
     plt.close(fig)
 
@@ -436,7 +486,7 @@ def show_temporal_effects(model, feature_names):
         plot_effect(ssr_range, ssr_effects, 'Efecto de la Radiación Solar en NO₂', 'Radiación (J/m²)', 'Efecto en NO₂')
 
 
-def show_gam_model_stats(model, X_test, y_test, feature_names):
+def show_gam_model_stats(model, X_test, y_test, feature_names, scaler_target):
     """
     Muestra las estadísticas del modelo y visualizaciones de efectos.
     
@@ -445,21 +495,23 @@ def show_gam_model_stats(model, X_test, y_test, feature_names):
         X_test (DataFrame): Variables predictoras para prueba.
         y_test (Series): Variable objetivo para prueba.
         feature_names (list): Lista de nombres de características.
+        scaler_target: Scaler para desescalar la variable objetivo.
     """
     # Calcular y mostrar métricas de evaluación
     y_pred = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
+    y_pred_descaled = scaler_target.inverse_transform(y_pred.reshape(-1, 1)).ravel()
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred_descaled))
+    r2 = r2_score(y_test, y_pred_descaled)
     
     # Crear panel de métricas
     col1, col2, col3 = st.columns(3)
     col1.metric("RMSE", f"{rmse:.2f} µg/m³", "Menor es mejor")
     col2.metric("R² Score", f"{r2:.3f}", "Más cercano a 1 es mejor")
-    col3.metric("MAE", f"{np.mean(np.abs(y_test - y_pred)):.2f} µg/m³", "Menor es mejor")
+    col3.metric("MAE", f"{np.mean(np.abs(y_test - y_pred_descaled)):.2f} µg/m³", "Menor es mejor")
     
     # Mostrar distribución de residuos
     st.write("### Distribución de Residuos")
-    residuals = y_test - y_pred
+    residuals = y_test - y_pred_descaled
     fig, ax = plt.subplots(1, 2, figsize=(12, 4))
     
     # Histograma de residuos
@@ -601,9 +653,6 @@ def training_page():
     
     # Dividir datos
     train_df, test_df = split_data(df_sensor, fecha_fin_training_dt)
-
-    print("train_df ", train_df.head())
-    print("test_df ", test_df.head())
     
     # Preparar conjuntos de entrenamiento y prueba
     X_train = train_df[selected_features].copy()
@@ -611,22 +660,39 @@ def training_page():
     X_test = test_df[selected_features].copy()
     y_test = test_df[target].copy()
 
-    #if file exisit, show stats, else show train button
+    # Escalar las variables
+    X_train, scaler_dict = estandarizar_variables(X_train, selected_features)
+    X_test = X_test.copy()
+    for col in selected_features:
+        X_test[col] = scaler_dict[col].transform(X_test[[col]])
+    
+    # Escalar el target
+    y_train_scaled, scaler_target = escalar_target(y_train)
 
-    model_path  = model_path + file_name + "_" + sensor_seleccionado + "_" + outlier_type + "_" + preprocessing_box + extension
-    if os.path.exists(model_path):
-        model = joblib.load(model_path)
-
-        # Botón para analizar modelo
-        if st.button("Analizar Modelo con Datos Seleccionados", key="analyze_button"):
+    full_model_path  = model_path + file_name + "_" + sensor_seleccionado + "_" + outlier_type + "_" + preprocessing_box + extension
+    
+    if os.path.exists(full_model_path):
+        model_info = joblib.load(full_model_path)
+        model = model_info['model']
+        scaler_dict = model_info['scaler_dict']
+        scaler_target = model_info['scaler_target']
+        
+        if st.button("Analizar Modelo con Datos Seleccionados"):
             with st.spinner("Analizando modelo..."):
-                show_gam_model_stats(model, X_test, y_test, selected_features)
+                # Desescalar para las visualizaciones
+                X_test_original = desescalar_variables(X_test.copy(), scaler_dict)
+                show_gam_model_stats(model, X_test_original, y_test, selected_features, scaler_target)
     else:
-        st.info(f"No se encontró el modelo {model_path}. Por favor, entrene un nuevo modelo.")
+        st.info(f"No se encontró el modelo {full_model_path}. Por favor, entrene un nuevo modelo.")
         # Botón para entrenar nuevo modelo
         if st.button("Entrenar Nuevo Modelo", key="train_button"):
             with st.spinner("Entrenando modelo... Este proceso puede tardar varios minutos."):
-                gam_train(X_train, y_train, selected_features, sensor_seleccionado, outlier_type, preprocessing_box)
+                X_train, scaler_dict = estandarizar_variables(X_train, selected_features)
+                X_test = X_test.copy()
+                for col in selected_features:
+                    X_test[col] = scaler_dict[col].transform(X_test[[col]])
+                y_train_scaled, scaler_target = escalar_target(y_train)
+                gam_train(X_train, y_train_scaled, selected_features, sensor_seleccionado, outlier_type, preprocessing_box, scaler_dict, scaler_target)
             st.success("¡Modelo entrenado correctamente!")
     
 
