@@ -388,15 +388,20 @@ def plot_effect(x_vals, y_vals, title, xlabel, ylabel, feature_name=None, xticks
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(x_vals, y_vals)
     
-    if feature_name in VARIABLE_METADATA:
+    # Manejar caso especial para días de la semana
+    if xlabel == 'Día de la Semana':
+        dias = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+        ax.set_xticks(range(7))
+        ax.set_xticklabels(dias, rotation=45)
+    elif feature_name in VARIABLE_METADATA:
         metadata = VARIABLE_METADATA[feature_name]
         xlabel = f"{metadata['name']} ({metadata['unit']})"
+        if xticks is not None:
+            ax.set_xticks(xticks)
     
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    if xticks is not None:
-        ax.set_xticks(xticks)
     ax.grid(True)
     
     # Añadir información sobre el rango típico si está disponible
@@ -443,7 +448,7 @@ def show_temporal_effects(model, feature_names):
 
     with col2:
         # Efecto del día de la semana
-        st.write("#### Efecto del Día de la Semana (0=Lunes, 6=Domingo)")
+        st.write("#### Efecto del Día de la Semana")
         days = np.arange(0, 7)
         day_effects = get_partial_effects(model, feature_names, days, sin_name='day_sin', cos_name='day_cos')
         plot_effect(days, day_effects, 'Efecto del Día de la Semana en NO₂', 'Día de la Semana', 'Efecto en NO₂', xticks=range(0, 7))
