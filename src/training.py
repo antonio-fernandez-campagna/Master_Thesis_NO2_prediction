@@ -701,3 +701,4 @@ def training_page():
             st.success("¡Modelo entrenado correctamente!")
     
 
+    

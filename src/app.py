@@ -20,6 +20,9 @@ from src.analsis_no2 import generar_analisis_no2
 from training import training_page
 from src.mapa_inicial_trafico_y_no2 import crear_mapa_trafico_y_no2_inicial
 from src.analisis_sensores_no2_y_trafico import analisis_sensores
+#from src.training_models import xgboost_page  # Añadir esta importación al principio
+#from src.training_models_2 import training_page as training_page_models
+from src.training_models_3 import training_page as training_page_models
 
 def main() -> None:
     """
@@ -31,7 +34,14 @@ def main() -> None:
     
     # Uso de pestañas para organizar la visualización de los mapas
     st.subheader("Visualización de Mapas")
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Mapa NO2 + Tráfico", "Mapa de asignaciones NO2 + traffic sensor", "Análisis de NO2", "Análisis sensores de trafico + meteorología + NO2", "Entrenamiento del modelo"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "Mapa NO2 + Tráfico",
+        "Mapa de asignaciones NO2 + traffic sensor",
+        "Análisis de NO2",
+        "Análisis sensores de trafico + meteorología + NO2",
+        "Entrenamiento del modelo GAM",
+        "Entrenamiento del modelo XGBoost"  # Nueva pestaña
+    ])
 
     # Solo cargar y renderizar el contenido de la pestaña activa
     with tab1:
@@ -90,6 +100,9 @@ def main() -> None:
 
     with tab5:
         training_page()
+
+    with tab6:
+        training_page_models()
 
 if __name__ == "__main__":
     main()
