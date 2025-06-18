@@ -8,19 +8,23 @@ from datetime import datetime
 # Funciones de caché para cargar datos
 @st.cache_data(ttl=3600)
 def cargar_datos_no2_locations():
-    return pd.read_csv('data/more_processed/no2_data_locations.csv')
+    df =  pd.read_csv('data/super_processed/4_no2_to_traffic_sensor_mapping.csv')
+    df.drop_duplicates(subset = ['id_no2'], inplace = True)
+    return df
+
+
 
 @st.cache_data(ttl=3600)
 def cargar_datos_traffic_locations():
-    return pd.read_csv('data/more_processed/traffic_data_locations_2024.csv')
+    return pd.read_excel('data/super_processed/1_all_traffic_sensors.xlsx')
 
 def crear_mapa_trafico_y_no2_simplificado():
     no2_data = cargar_datos_no2_locations()
     traffic_data = cargar_datos_traffic_locations()
     
     # Encontrar el centro óptimo para el mapa
-    all_lats = pd.concat([no2_data["latitud"], traffic_data["latitud"]])
-    all_lons = pd.concat([no2_data["longitud"], traffic_data["longitud"]])
+    all_lats = pd.concat([no2_data["latitud_no2"], traffic_data["latitud"]])
+    all_lons = pd.concat([no2_data["longitud_no2"], traffic_data["longitud"]])
     
     map_center = [all_lats.mean(), all_lons.mean()]
     m = folium.Map(location=map_center, zoom_start=12, tiles="CartoDB positron")
@@ -30,7 +34,7 @@ def crear_mapa_trafico_y_no2_simplificado():
     
     for _, row in no2_data.iterrows():
         folium.CircleMarker(
-            location=[row["latitud"], row["longitud"]],
+            location=[row["latitud_no2"], row["longitud_no2"]],
             radius=6,
             color='blue',
             fill=True,
@@ -39,7 +43,7 @@ def crear_mapa_trafico_y_no2_simplificado():
             popup=folium.Popup(
                 f"""<div style='width: 200px'>
                     <b>Sensor NO2:</b> {row['id_no2']}<br>
-                    <b>Ubicación:</b> {row['latitud']:.5f}, {row['longitud']:.5f}
+                    <b>Ubicación:</b> {row['latitud_no2']:.5f}, {row['longitud_no2']:.5f}
                 </div>""",
                 max_width=300
             )
@@ -111,17 +115,18 @@ def crear_mapa_trafico_y_no2_inicial():
         st.metric("Sensores de Tráfico", len(traffic_data))
     
     with col3:
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+        timestamp = "2024-12-12"
         st.metric("Última actualización", timestamp)
     
     # Mostrar el mapa
     st.subheader("Mapa de Sensores")
     mapa = crear_mapa_trafico_y_no2_simplificado()
     
-    # Botón para actualizar el mapa
-    if st.button("Actualizar Datos"):
-        st.cache_data.clear()
-        st.experimental_rerun()
+    # # Botón para actualizar el mapa
+    # if st.button("Actualizar Datos"):
+    #     st.cache_data.clear()
+    #     st.experimental_rerun()
     
     # Mostrar el mapa
     folium_static(mapa, width=1200, height=600)

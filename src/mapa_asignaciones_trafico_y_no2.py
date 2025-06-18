@@ -18,14 +18,19 @@ import gc
 
 
 @st.cache_data(ttl=3600)
-def cargar_mapping_no2_traffic():
+def cargar_datos():
     """Carga y almacena en caché el mapeo entre sensores NO2 y tráfico"""
-    return pd.read_csv('data/more_processed/mapping_no2_y_traffic_filtered_by_proximity.csv')
+    #return pd.read_csv('data/super_processed/4_no2_to_traffic_sensor_mapping.csv')
+    df = pd.read_parquet('data/super_processed/7_5_no2_with_1traffic_id.parquet')
 
-@st.cache_data(ttl=3600)
-def cargar_datos_traffic():
-    """Carga datos de tráfico con caché"""
-    return pd.read_parquet('data/more_processed/traffic_data.parquet')
+    #drop duplicates
+    #df = df.drop_duplicates(subset = ['id_no2'])
+    
+    return df
+
+def cargar_datos_traffic_mapping():
+    return pd.read_excel('data/super_processed/1_all_traffic_sensors.xlsx')
+
 
 
 # def limpiar_cache():
@@ -39,7 +44,16 @@ def cargar_datos_traffic():
 
 def crear_mapa_sensores_asignados_a_cada_no2():
     
-    df = cargar_mapping_no2_traffic()
+    df = cargar_datos()
+    df = df.copy().drop_duplicates(subset = ['id_no2'])
+
+    df_traffic_mapping = cargar_datos_traffic_mapping()
+
+    df_traffic_mapping['id_trafico'] = df_traffic_mapping['id_trafico'].astype(str)
+    df['id_trafico'] = df['id_trafico'].astype(str)
+
+    df = df.merge(df_traffic_mapping, on = 'id_trafico', how = 'left')
+    df = df.rename(columns = {'latitud':'latitud_trafico', 'longitud':'longitud_trafico'})
 
     # Create a map centered around the average latitude and longitude
     map_center = [df['latitud_no2'].mean(), df['longitud_no2'].mean()]
@@ -85,62 +99,13 @@ def crear_mapa_sensores_asignados_a_cada_no2():
     return m, unique
 
 
-def crear_mapa_sensores_asignados_a_cada_no2_continuo():
-    
-    df = cargar_mapping_no2_traffic()
-
-    list_id_trafico_continuo = [5547, 5783, 5465, 5414, 5084, 4555, 4129, 3915, 3911]
-    
-    df = df[df['id_trafico'].isin(list_id_trafico_continuo)]
-
-    # Create a map centered around the average latitude and longitude
-    map_center = [df['latitud_no2'].mean(), df['longitud_no2'].mean()]
-    m = folium.Map(location=map_center, zoom_start=12)
-
-    # Generate a list of colors for the NO2 sensors
-    colors = ['blue', 'green', 'orange', 'purple', 'darkred', 'lightred', 'beige', 'darkblue', 'darkgreen', 'cadetblue', 'pink', 'lightblue']
-
-    # Dictionary to hold the color for each NO2 sensor
-    no2_colors = {}
-
-    # Add markers for NO2 sensors with unique colors
-    for _, row in df.iterrows():
-        if row['id_no2'] not in no2_colors:
-            # Assign a random color from the list
-            color = random.choice(colors)
-            no2_colors[row['id_no2']] = color
-        
-        # Add a circle marker for NO2 sensors
-        folium.CircleMarker(
-            location=[row['latitud_no2'], row['longitud_no2']],
-            radius=12,
-            #color=no2_colors[row['id_no2']],
-            fill=True,
-            fill_opacity=0.6,
-            popup=f"NO2 Sensor ID: {row['id_no2']}",
-            tooltip=f"NO2 Sensor ID: {row['id_no2']}"
-        ).add_to(m)
-
-    # Add markers for Traffic data with the same color as the corresponding NO2 sensor
-    for _, row in df.iterrows():
-        folium.Marker(
-            location=[row['latitud_trafico'], row['longitud_trafico']],
-            popup=f"Traffic ID: {row['id_trafico']}, NO2 ID: {row['id_no2']}",
-            icon=folium.DivIcon(
-                html=f'<div style="font-size: 10pt">🚦</div>'  
-            )
-        ).add_to(m)
-
-    # Save the map to an HTML file or display it directly
-    return m
-
-
 
 # Función para mostrar la continuidad de datos
 def mostrar_continuidad(sensor):
     with st.spinner("Cargando datos de continuidad..."):
-        df = cargar_datos_traffic()
-        
+            
+        df = cargar_datos()
+            
         # Filtrar y procesar solo los datos necesarios
         df = df[df['id_trafico'] == str(sensor)].copy()
 
