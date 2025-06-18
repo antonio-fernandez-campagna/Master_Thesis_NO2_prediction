@@ -16,8 +16,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 pd.options.display.float_format = "{:.2f}".format
 
 # Importar módulos refactorizados
+from src.welcome_page_refactored import welcome_page
 from src.analsis_no2_refactored import generar_analisis_no2
 from src.mapa_asignaciones_trafico_y_no2_refactored import generar_mapa_asignaciones
+from src.analisis_sensores_no2_y_trafico_refactored import analisis_sensores
+from src.training_refactored import training_page
+from src.xgboost_training_refactored import xgboost_training_page
+from src.bayesian_nowcasting import bayesian_nowcasting_page
 
 
 # ==================== CONFIGURACIÓN Y CONSTANTES ====================
@@ -30,6 +35,11 @@ PAGE_CONFIG = {
 }
 
 TAB_CONFIG = {
+    "🏠 Inicio": {
+        "icon": "🏠",
+        "description": "Página de bienvenida e introducción al proyecto",
+        "function": welcome_page
+    },
     "Análisis NO₂": {
         "icon": "🌍",
         "description": "Análisis temporal y espacial de niveles de NO₂",
@@ -39,6 +49,26 @@ TAB_CONFIG = {
         "icon": "🗺️", 
         "description": "Asignación entre sensores de NO₂ y tráfico",
         "function": generar_mapa_asignaciones
+    },
+    "Correlaciones": {
+        "icon": "📊",
+        "description": "Análisis de correlaciones entre NO₂, tráfico y meteorología",
+        "function": analisis_sensores
+    },
+    "Entrenamiento GAM": {
+        "icon": "🤖",
+        "description": "Entrenamiento y análisis de modelos GAM para predicción de NO₂",
+        "function": training_page
+    },
+    "Entrenamiento XGBoost": {
+        "icon": "⚡",
+        "description": "Entrenamiento y análisis de modelos XGBoost para predicción de NO₂",
+        "function": xgboost_training_page
+    },
+    "Nowcasting Bayesiano": {
+        "icon": "🧠",
+        "description": "Nowcasting de NO₂ con redes neuronales bayesianas e incertidumbre",
+        "function": bayesian_nowcasting_page
     }
     # Aquí se pueden añadir más tabs fácilmente
     # "Predicción": {
@@ -208,6 +238,18 @@ def show_sidebar_info():
                 st.success("✅ Datos de mapeo cargados")
             else:
                 st.info("⏳ Datos de mapeo pendientes")
+        
+        if hasattr(st.session_state, 'sensor_data_loaded'):
+            if st.session_state.sensor_data_loaded:
+                st.success("✅ Datos de sensores cargados")
+            else:
+                st.info("⏳ Datos de sensores pendientes")
+        
+        if hasattr(st.session_state, 'training_data_loaded'):
+            if st.session_state.training_data_loaded:
+                st.success("✅ Datos de entrenamiento cargados")
+            else:
+                st.info("⏳ Datos de entrenamiento pendientes")
 
 
 def handle_navigation():

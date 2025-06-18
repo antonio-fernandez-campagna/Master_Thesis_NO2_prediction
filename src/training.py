@@ -27,7 +27,7 @@ def cargar_datos_trafico_y_meteo():
     Returns:
         DataFrame: Datos de NO2, tráfico y meteorología con fecha convertida a datetime.
     """
-    df = pd.read_parquet('data/more_processed/no2_with_traffic_and_meteo_one_station.parquet')
+    df = pd.read_parquet('data/more_processed_copy/NOT_USE_no2_with_traffic_and_meteo_one_station.parquet')
     df['fecha'] = pd.to_datetime(df['fecha'])
     return df
 

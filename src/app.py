@@ -18,7 +18,7 @@ from src.mapa_asignaciones_trafico_y_no2 import (
 )
 
 from src.analsis_no2 import generate_analisis_no2
-# from training import training_page as training_page_gam     
+from training import training_page as training_page_gam     
 # from src.analisis_sensores_no2_y_trafico import analisis_sensores
 # from train_xgboost_model import training_page as training_xgboost_page
 
@@ -97,8 +97,8 @@ def main() -> None:
     # with tab4:
     #     analisis_sensores()
 
-    # with tab5:
-    #     training_page_gam()
+    with tab5:
+        training_page_gam()
 
     # with tab6:
     #     training_xgboost_page()
