@@ -1,107 +1,240 @@
+"""
+Aplicación principal refactorizada para análisis de contaminación y tráfico en Madrid.
+
+Esta aplicación proporciona múltiples módulos de análisis a través de un sistema de tabs,
+cada uno con su propio sidebar y configuración específica.
+"""
+
 import streamlit as st
+from typing import Dict, Callable
 import sys
 import os
-import folium
-from streamlit_folium import folium_static
 import pandas as pd
 
 # Configuración de rutas y formato de números
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 pd.options.display.float_format = "{:.2f}".format
 
+# Importar configuración centralizada
+from src.config import PAGE_CONFIG, TAB_CONFIG
 
-from src.mapa_inicial_trafico_y_no2 import crear_mapa_trafico_y_no2_inicial
+# Importar módulos refactorizados
+from src.welcome_page import welcome_page
+from src.no2_analysis import generar_analisis_no2
+from src.sensor_mapping import generar_mapa_asignaciones
+from src.correlations_analysis import analisis_sensores
+from src.gam_training import training_page
+from src.xgboost_unified import xgboost_unified_page
+from src.bayesian_nowcasting import bayesian_nowcasting_page
 
-from src.mapa_asignaciones_trafico_y_no2 import (
-    crear_mapa_sensores_asignados_a_cada_no2,
-    mostrar_continuidad,
-)
+# ==================== CONFIGURACIÓN DE TABS CON FUNCIONES ====================
 
-from src.analsis_no2 import generate_analisis_no2
-from training import training_page as training_page_gam     
-# from src.analisis_sensores_no2_y_trafico import analisis_sensores
-# from train_xgboost_model import training_page as training_xgboost_page
+TAB_FUNCTIONS = {
+    "🏠 Inicio": welcome_page,
+    "Análisis NO₂": generar_analisis_no2,
+    "Mapeo Sensores": generar_mapa_asignaciones,
+    "Correlaciones": analisis_sensores,
+    "Entrenamiento GAM": training_page,
+    "XGBoost Unificado": xgboost_unified_page,
+    "Nowcasting Bayesiano": bayesian_nowcasting_page
+}
 
-def main() -> None:
-    """
-    Función principal de la app.
-    """
-    st.set_page_config(page_title="NO2 Sensors Map", layout="wide")
-    st.title("Análisis del NO2 en relación al tráfico y meteorología")
+# ==================== CLASE PRINCIPAL ====================
+
+class DashboardApp:
+    """Clase principal para manejar la aplicación dashboard."""
     
+    def __init__(self):
+        self._configure_page()
+        self._initialize_session_state()
     
-    # Uso de pestañas para organizar la visualización de los mapas
-    st.subheader("Visualización de Mapas")
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "Mapa NO2 + Tráfico",
-        "Mapa de asignaciones NO2 + traffic sensor",
-        "Análisis de NO2",
-        "Análisis sensores de trafico + meteorología + NO2",
-        "Entrenamiento del modelo GAM",
-        "Entrenamiento del modelo XGBoost"  # Nueva pestaña
-    ])
-
-    # Solo cargar y renderizar el contenido de la pestaña activa
-    with tab1:
-        #if st.button("Cargar mapa de NO2 y Tráfico", key="load_map1"):
-        with st.spinner("Cargando mapa..."):
-            crear_mapa_trafico_y_no2_inicial()
+    def _configure_page(self):
+        """Configura la página de Streamlit."""
+        st.set_page_config(**PAGE_CONFIG)
+    
+    def _initialize_session_state(self):
+        """Inicializa variables globales de session_state."""
+        if 'current_tab' not in st.session_state:
+            st.session_state.current_tab = list(TAB_CONFIG.keys())[0]
+        if 'app_initialized' not in st.session_state:
+            st.session_state.app_initialized = True
+    
+    def _clear_sidebar_for_tab(self, tab_name: str):
+        """Limpia el sidebar cuando cambia de tab."""
+        # Solo limpiar si realmente cambió de tab
+        if st.session_state.get('previous_tab') != tab_name:
+            # Limpiar variables específicas del sidebar del tab anterior
+            keys_to_remove = [
+                key for key in st.session_state.keys() 
+                if key.startswith(('sidebar_', 'filter_', 'config_'))
+            ]
+            for key in keys_to_remove:
+                del st.session_state[key]
+            
+            st.session_state.previous_tab = tab_name
+    
+    def _show_header(self):
+        """Muestra el header principal de la aplicación."""
+        st.title("🌍 Dashboard Madrid - Calidad del Aire y Tráfico")
+        st.markdown("""
+        <div style="margin-bottom: 2rem;">
+            <p style="font-size: 1.1rem; color: #666;">
+                Análisis integrado de datos de contaminación atmosférica y tráfico en la ciudad de Madrid
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    def _show_tab_description(self, tab_name: str):
+        """Muestra la descripción del tab actual."""
+        config = TAB_CONFIG.get(tab_name, {})
+        if config.get('description'):
+            st.markdown(f"""
+            <div style="background-color: #f0f8ff; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <h4 style="margin: 0; color: #1f4e79;">
+                    {config.get('icon', '')} {tab_name}
+                </h4>
+                <p style="margin: 0.5rem 0 0 0; color: #666;">
+                    {config['description']}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    def _create_tabs(self) -> Dict:
+        """Crea y configura los tabs de la aplicación."""
+        tab_names = list(TAB_CONFIG.keys())
+        tab_labels = [f"{TAB_CONFIG[name]['icon']} {name}" for name in tab_names]
         
-        # if "map_1" in st.session_state:
-        #     st.write("### Mapa NO2 y Tráfico")
-        #     folium_static(st.session_state["map_1"])
-        # else:
-        #     st.info("Haz clic en el botón para cargar el mapa NO2 + Tráfico.")
-
-    with tab2:
-        col1, col2 = st.columns([1, 1])
-          
-        with col1:
-            # if st.button("Cargar mapa de asignaciones", key="load_map2"):
-            #     with st.spinner("Cargando mapa..."):
-            st.session_state["map_2"], st.session_state["id_trafico_cercanos"] = crear_mapa_sensores_asignados_a_cada_no2()
+        tabs = st.tabs(tab_labels)
+        return dict(zip(tab_names, tabs))
+    
+    def _execute_tab_function(self, tab_name: str, tab_container):
+        """Ejecuta la función asociada a un tab específico."""
+        config = TAB_CONFIG.get(tab_name)
+        
+        if not config:
+            st.error(f"Configuración no encontrada para el tab: {tab_name}")
+            return
+        
+        function = TAB_FUNCTIONS.get(tab_name)
+        
+        if not function:
+            st.error(f"Función no definida para el tab: {tab_name}")
+            return
+        
+        try:
+            with tab_container:
+                # Mostrar descripción del tab
+                self._show_tab_description(tab_name)
+                
+                # Limpiar sidebar si es necesario
+                self._clear_sidebar_for_tab(tab_name)
+                
+                # Ejecutar función del tab
+                function()
+                
+        except Exception as e:
+            st.error(f"Error al ejecutar {tab_name}: {str(e)}")
+            st.exception(e)
+    
+    def _show_footer(self):
+        """Muestra el footer de la aplicación."""
+        st.markdown("---")
+        st.markdown("""
+        <div style="text-align: center; color: #666; font-size: 0.9rem; margin-top: 2rem;">
+            <p>
+                <strong>Dashboard Madrid - Calidad del Aire y Tráfico</strong><br>
+                Datos proporcionados por el Ayuntamiento de Madrid<br>
+                Desarrollado para análisis de investigación científica
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    def run(self):
+        """Método principal para ejecutar la aplicación."""
+        try:
+            # Mostrar header
+            self._show_header()
             
-            if "map_2" in st.session_state:
-                st.write("### Mapa de asignaciones NO2 y sensores de tráfico con mayor número de datos")
-                st.write("(Se han filtrado los sensores de aire que tengan al menos un sensor de tráfico a 200m) ")
-                folium_static(st.session_state["map_2"])
+            # Crear tabs
+            tabs = self._create_tabs()
+            
+            # Ejecutar funciones de cada tab
+            for tab_name, tab_container in tabs.items():
+                self._execute_tab_function(tab_name, tab_container)
+            
+            # Mostrar footer
+            self._show_footer()
+            
+        except Exception as e:
+            st.error("Error crítico en la aplicación")
+            st.exception(e)
+
+
+# ==================== FUNCIONES AUXILIARES ====================
+
+def show_sidebar_info():
+    """Muestra información general en el sidebar."""
+    with st.sidebar:
+        st.markdown("## ℹ️ Información")
+        st.markdown("""
+        **Navegación:**
+        - Usa las pestañas superiores para cambiar entre módulos
+        - Cada módulo tiene controles específicos en este panel lateral
+        - Los datos se cargan automáticamente al acceder a cada sección
+        """)
+        
+        st.markdown("---")
+        st.markdown("**Estado de la aplicación:**")
+        
+        # Mostrar estado de carga de datos
+        if hasattr(st.session_state, 'data_loaded'):
+            if st.session_state.data_loaded:
+                st.success("✅ Datos de NO₂ cargados")
             else:
-                st.info("Haz clic en el botón para cargar el mapa de asignaciones.")
+                st.info("⏳ Datos de NO₂ pendientes")
+        
+        if hasattr(st.session_state, 'mapping_data_loaded'):
+            if st.session_state.mapping_data_loaded:
+                st.success("✅ Datos de mapeo cargados")
+            else:
+                st.info("⏳ Datos de mapeo pendientes")
+        
+        if hasattr(st.session_state, 'sensor_data_loaded'):
+            if st.session_state.sensor_data_loaded:
+                st.success("✅ Datos de sensores cargados")
+            else:
+                st.info("⏳ Datos de sensores pendientes")
+        
+        if hasattr(st.session_state, 'training_data_loaded'):
+            if st.session_state.training_data_loaded:
+                st.success("✅ Datos de entrenamiento cargados")
+            else:
+                st.info("⏳ Datos de entrenamiento pendientes")
 
-        with col2:
-            # Solo mostrar el selector si los datos están disponibles
-            if "id_trafico_cercanos" in st.session_state:
-                st.write("### Todos los sensores cercanos al sensor NO2")
-                sensor = st.selectbox(
-                    "Seleccione un sensor para visualizar la continuidad temporal",
-                    st.session_state["id_trafico_cercanos"]
-                )
-                if st.button("Mostrar continuidad", key="show_continuity"):
-                    mostrar_continuidad(sensor)
-            
-        # with col2:
-        #     if st.button("Cargar mapa de sensores continuos", key="load_map3"):
-        #         with st.spinner("Cargando mapa..."):
-        #             st.session_state["map_3"] = crear_mapa_sensores_asignados_a_cada_no2_continuo()
-            
-        #     if "map_3" in st.session_state:
-        #         st.write("### Sensores de tráfico filtrados por tener la mayor continuidad")
-        #         st.write("Todos los datos han sido previamente filtrados >= 2018.")
-        #         folium_static(st.session_state["map_3"])
-            # else:
-            #     st.info("Haz clic en el botón para cargar el mapa de sensores continuos.")
 
-    with tab3:
-        generate_analisis_no2()
+def handle_navigation():
+    """Maneja la navegación entre tabs."""
+    # Esta función puede expandirse para manejar navegación más compleja
+    # Por ejemplo, deep linking, estado persistente entre tabs, etc.
+    pass
 
-    # with tab4:
-    #     analisis_sensores()
 
-    with tab5:
-        training_page_gam()
+# ==================== FUNCIÓN PRINCIPAL ====================
 
-    # with tab6:
-    #     training_xgboost_page()
+def main():
+    """Función principal de la aplicación."""
+    # Crear y ejecutar la aplicación
+    app = DashboardApp()
+    
+    # Mostrar información general en sidebar
+    show_sidebar_info()
+    
+    # Manejar navegación
+    handle_navigation()
+    
+    # Ejecutar aplicación principal
+    app.run()
+
 
 if __name__ == "__main__":
-    main()
+    main() 

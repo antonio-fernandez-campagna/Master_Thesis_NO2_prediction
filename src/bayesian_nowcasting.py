@@ -122,8 +122,7 @@ FEATURE_GROUPS = {
         'weekend', 'season_sin', 'season_cos'
     ],
     "Variables de Tráfico": ['intensidad', 'carga', 'ocupacion', 'vmed'],
-    "Variables Meteorológicas": ['d2m', 't2m', 'ssr', 'ssrd', 'u10', 'v10', 'sp', 'tp', 'wind_speed', 'wind_direction'],
-    "NO₂ Histórico": ['no2_lag_1', 'no2_lag_2', 'no2_lag_3', 'no2_lag_6', 'no2_lag_12', 'no2_lag_24']
+    "Variables Meteorológicas": ['d2m', 't2m', 'ssr', 'ssrd', 'u10', 'v10', 'sp', 'tp', 'wind_speed', 'wind_direction']
 }
 
 

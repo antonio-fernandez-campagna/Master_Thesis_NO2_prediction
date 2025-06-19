@@ -106,65 +106,6 @@ VARIABLES_INFO = {
 }
 
 
-# ==================== FUNCIONES AUXILIARES ====================
-
-def create_timeline_chart():
-    """Crea un gráfico de línea temporal mostrando la evolución del proyecto."""
-    timeline_data = [
-        {'Date': '2024-01', 'Phase': 'Recopilación de datos', 'Progress': 100},
-        {'Date': '2024-02', 'Phase': 'Limpieza y preprocesamiento', 'Progress': 100},
-        {'Date': '2024-03', 'Phase': 'Análisis exploratorio', 'Progress': 100},
-        {'Date': '2024-04', 'Phase': 'Mapeo de sensores', 'Progress': 100},
-        {'Date': '2024-05', 'Phase': 'Modelos GAM', 'Progress': 100},
-        {'Date': '2024-06', 'Phase': 'Modelos XGBoost', 'Progress': 100},
-        {'Date': '2024-07', 'Phase': 'Dashboard interactivo', 'Progress': 100}
-    ]
-    
-    df = pd.DataFrame(timeline_data)
-    
-    fig = px.line(df, x='Date', y='Progress',
-                  title='Cronología del Proyecto',
-                  markers=True,
-                  line_shape='spline')
-    
-    fig.update_layout(
-        xaxis_title='Período',
-        yaxis_title='Progreso (%)',
-        yaxis=dict(range=[0, 110]),
-        height=300
-    )
-    
-    return fig
-
-
-def create_data_summary_chart():
-    """Crea un gráfico resumen de los datos disponibles."""
-    data_summary = {
-        'Fuente': ['Sensores NO₂', 'Sensores Tráfico', 'Meteorología'],
-        'Registros': [150000, 500000, 50000],
-        'Período': ['2018-2024', '2018-2024', '2018-2024'],
-        'Cobertura': [85, 92, 98]
-    }
-    
-    fig = go.Figure(data=[
-        go.Bar(name='Registros (miles)', x=data_summary['Fuente'], 
-               y=[x/1000 for x in data_summary['Registros']], yaxis='y', offsetgroup=1),
-        go.Bar(name='Cobertura (%)', x=data_summary['Fuente'], 
-               y=data_summary['Cobertura'], yaxis='y2', offsetgroup=2)
-    ])
-
-    fig.update_layout(
-        title='Resumen de Datos Disponibles',
-        xaxis_title='Fuente de Datos',
-        yaxis=dict(title='Registros (miles)', side='left'),
-        yaxis2=dict(title='Cobertura (%)', side='right', overlaying='y'),
-        barmode='group',
-        height=400
-    )
-    
-    return fig
-
-
 # ==================== FUNCIONES DE VISUALIZACIÓN ====================
 
 def show_project_header():
@@ -217,10 +158,6 @@ def show_project_overview():
 def show_data_sources():
     """Muestra información sobre las fuentes de datos."""
     st.header("📊 Fuentes de Datos")
-    
-    # Gráfico resumen
-    fig = create_data_summary_chart()
-    st.plotly_chart(fig, use_container_width=True)
     
     # Detalles de cada fuente
     for source, info in DATA_SOURCES.items():
@@ -405,9 +342,7 @@ def show_getting_started():
     💡 **Tip:** Cada módulo incluye un panel de ayuda (ℹ️) con documentación detallada.
     """)
     
-    # Timeline del proyecto
-    fig = create_timeline_chart()
-    st.plotly_chart(fig, use_container_width=True)
+ 
 
 
 def show_technical_specs():
