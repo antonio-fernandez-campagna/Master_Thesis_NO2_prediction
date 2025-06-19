@@ -455,9 +455,6 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
         """
         st.header("📊 Análisis del Modelo XGBoost")
         
-        # Guardar resultados en session_state
-        st.session_state.xgb_unified_analysis_data[config_key] = results
-        
         # Mostrar directamente todo el análisis
         self._show_analysis_content(results)
 
@@ -472,15 +469,11 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
             st.divider()
             self._show_global_sensor_analysis(results)
         
-        # Si es modelo individual, mostrar análisis temporal
+        # Si es modelo individual, mostrar análisis temporal completo
         elif 'sensor' in results['config']:
             st.divider()
-            st.subheader("📈 Análisis Temporal del Sensor")
-            show_temporal_predictions(results['test_df'], results['metrics']['y_pred'])
-            
-            st.divider()
-            st.subheader("📉 Análisis de Residuos Temporales")
-            show_residuals_over_time(results['test_df'], results['metrics']['y_pred'])
+            st.subheader("📈 Métricas de Evaluación")
+            show_model_metrics(results['metrics'])
             
             st.divider()
             st.subheader("📊 Análisis de Residuos")
@@ -489,9 +482,17 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
                 results['metrics']['y_pred']
             )
             
+            # Mostrar análisis temporal detallado directamente
             st.divider()
-            st.subheader("📈 Métricas de Evaluación")
-            show_model_metrics(results['metrics'])
+            sensor_data = {
+                'sensor_data': results['test_df'],
+                'y_true': results['test_df']['no2_value'],
+                'y_pred': results['metrics']['y_pred'],
+                'rmse': results['metrics']['rmse'],
+                'r2': results['metrics']['r2'],
+                'mae': results['metrics']['mae']
+            }
+            self._show_detailed_sensor_analysis(results['config']['sensor'], sensor_data, context="individual")
 
     def _show_global_sensor_analysis(self, results: Dict):
         """Muestra análisis detallado por sensor para modelo global."""
@@ -636,7 +637,7 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
             sensor_seleccionado = st.selectbox(
                 "Selecciona sensor para análisis detallado:",
                 sensores_test,
-                key="global_xgb_analysis_sensor",
+                key=f"unified_global_xgb_analysis_sensor_{len(sensores_test)}",
                 help="Escoge un sensor para ver análisis temporal detallado y comparación de predicciones"
             )
         
@@ -651,9 +652,9 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
                 )
         
         # Análisis detallado del sensor seleccionado
-        if st.checkbox("📈 Mostrar Análisis Temporal Detallado", key="show_detailed_xgb_analysis"):
+        if st.checkbox("📈 Mostrar Análisis Temporal Detallado", key=f"unified_show_detailed_xgb_analysis_{len(sensores_test)}"):
             if sensor_seleccionado in sensor_predictions:
-                self._show_detailed_sensor_analysis(sensor_seleccionado, sensor_predictions[sensor_seleccionado])
+                self._show_detailed_sensor_analysis(sensor_seleccionado, sensor_predictions[sensor_seleccionado], context="global")
             else:
                 st.error(f"No hay datos disponibles para el sensor {sensor_seleccionado}")
 
@@ -695,7 +696,7 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
         st.pyplot(fig)
         plt.close()
 
-    def _show_detailed_sensor_analysis(self, sensor_id: str, sensor_data: Dict):
+    def _show_detailed_sensor_analysis(self, sensor_id: str, sensor_data: Dict, context: str):
         """Muestra análisis detallado para un sensor específico."""
         
         st.subheader(f"📊 Análisis Detallado - Sensor {sensor_id}")
@@ -746,7 +747,7 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
                 value=(df_plot.index.min().date(), df_plot.index.max().date()),
                 min_value=df_plot.index.min().date(),
                 max_value=df_plot.index.max().date(),
-                key=f"sensor_{sensor_id}_date_range"
+                key=f"unified_{context}_{sensor_id}_detailed_date_range"
             )
         
         with col2:
@@ -754,7 +755,7 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
                 "Granularidad:",
                 options=['Horaria', 'Media Diaria', 'Media Semanal'],
                 index=1,  # Media Diaria por defecto
-                key=f"sensor_{sensor_id}_granularity"
+                key=f"unified_{context}_{sensor_id}_detailed_granularity"
             )
         
         # Filtrar por fechas
@@ -916,7 +917,7 @@ class XGBoostUnifiedTrainer(XGBoostTrainer):
             plt.close()
             
             # Mostrar tabla de estadísticas horarias
-            with st.expander(f"📋 Estadísticas Horarias Detalladas - Sensor {sensor_id}"):
+            with st.expander(f"📋 Estadísticas Horarias Detalladas - Sensor {sensor_id}", expanded=False):
                 st.dataframe(hourly_stats, use_container_width=True)
 
 
@@ -1087,7 +1088,7 @@ def xgboost_unified_page():
                 # Evaluar modelo
                 metrics = unified_trainer.evaluate_model(model_info['model'], X_test, y_test, model_info['scaler_target'])
                 
-                # Crear resultados
+                # Crear resultados y guardar en session_state
                 results = {
                     'model': model_info['model'],
                     'metrics': metrics,
@@ -1097,18 +1098,18 @@ def xgboost_unified_page():
                     'selected_features': selected_features,
                     'config': config
                 }
-                
-                unified_trainer.show_analysis_interface(results, config_key)
+                st.session_state.xgb_unified_analysis_data[config_key] = results
     
     # Ejecutar entrenamiento
-    if train_button:
+    elif train_button:
         results = unified_trainer.train_model(data_prep, selected_features, config)
         
         if results:
-            unified_trainer.show_analysis_interface(results, config_key)
+            # Guardar en session_state
+            st.session_state.xgb_unified_analysis_data[config_key] = results
     
-    # Mostrar análisis si ya existe en session_state
-    elif config_key in st.session_state.xgb_unified_analysis_data:
+    # Mostrar análisis SOLO UNA VEZ si existe en session_state
+    if config_key in st.session_state.xgb_unified_analysis_data:
         results = st.session_state.xgb_unified_analysis_data[config_key]
         unified_trainer.show_analysis_interface(results, config_key)
 

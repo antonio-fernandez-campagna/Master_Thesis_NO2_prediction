@@ -423,7 +423,7 @@ def show_feature_importance(model: xgb.XGBRegressor, feature_names: List[str]):
             st.dataframe(importance_df.sort_values('importance', ascending=False), use_container_width=True)
 
 
-def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
+def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray, key_prefix: str = "default"):
     """Muestra gráficos temporales de predicciones vs valores reales."""
     df_plot = test_df[['fecha', 'no2_value']].copy()
     df_plot['Predicción'] = y_pred
@@ -440,7 +440,7 @@ def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
             value=(df_plot.index.min().date(), df_plot.index.max().date()),
             min_value=df_plot.index.min().date(),
             max_value=df_plot.index.max().date(),
-            key="temporal_predictions_date_range"
+            key=f"{key_prefix}_temporal_predictions_date_range"
         )
     
     with col2:
@@ -448,7 +448,7 @@ def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
             "Granularidad:",
             options=['Horaria', 'Media Diaria', 'Media Semanal'],
             index=0,
-            key="temporal_predictions_granularity"
+            key=f"{key_prefix}_temporal_predictions_granularity"
         )
     
     # Filtrar por fechas
@@ -493,7 +493,7 @@ def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
     plt.close()
 
 
-def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray):
+def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray, key_prefix: str = "default"):
     """Muestra residuos a lo largo del tiempo."""
     df_plot = test_df[['fecha', 'no2_value']].copy()
     df_plot['Residuos'] = df_plot['no2_value'] - y_pred
@@ -510,7 +510,7 @@ def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray):
             value=(df_plot.index.min().date(), df_plot.index.max().date()),
             min_value=df_plot.index.min().date(),
             max_value=df_plot.index.max().date(),
-            key="residuals_over_time_date_range"
+            key=f"{key_prefix}_residuals_over_time_date_range"
         )
     
     with col2:
@@ -518,7 +518,7 @@ def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray):
             "Granularidad de errores:",
             options=['Horaria', 'Media Diaria', 'MAE Diario', 'Media Semanal'],
             index=0,
-            key="residuals_over_time_granularity"
+            key=f"{key_prefix}_residuals_over_time_granularity"
         )
     
     # Filtrar datos
@@ -626,6 +626,229 @@ def show_info_panel():
                 if key != 'config_key':  # No mostrar la clave interna
                     config_info += f"**{key.replace('_', ' ').title()}:** {value}  \n"
             st.markdown(config_info)
+
+
+def show_detailed_individual_analysis(test_df: pd.DataFrame, y_pred: np.ndarray, metrics: Dict, sensor_id: str, key_prefix: str = "individual_detailed"):
+    """Muestra análisis temporal detallado para un sensor individual similar al análisis global."""
+    
+    st.subheader(f"📊 Análisis Detallado - Sensor {sensor_id}")
+    
+    y_true = test_df['no2_value']
+    
+    # Métricas del sensor
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("RMSE", f"{metrics['rmse']:.2f} µg/m³")
+    with col2:
+        st.metric("R²", f"{metrics['r2']:.3f}")
+    with col3:
+        st.metric("MAE", f"{metrics['mae']:.2f} µg/m³")
+    with col4:
+        # Calcular sesgo
+        bias = np.mean(y_pred - y_true)
+        st.metric("Sesgo", f"{bias:.2f} µg/m³")
+    
+    # Información del período
+    st.markdown("### 📅 Información del Período de Evaluación")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Muestras", len(test_df))
+    with col2:
+        st.metric("Fecha Inicio", test_df['fecha'].min().strftime('%Y-%m-%d'))
+    with col3:
+        st.metric("Fecha Fin", test_df['fecha'].max().strftime('%Y-%m-%d'))
+    
+    # Análisis temporal específico del sensor
+    st.markdown("### 📈 Análisis Temporal del Sensor")
+    
+    # Crear DataFrame para visualización temporal
+    df_plot = test_df[['fecha', 'no2_value']].copy()
+    df_plot['Predicción'] = y_pred
+    df_plot['Residuo'] = y_true - y_pred
+    df_plot = df_plot.set_index('fecha')
+    
+    # Controles de visualización
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        date_range = st.date_input(
+            "Rango de fechas:",
+            value=(df_plot.index.min().date(), df_plot.index.max().date()),
+            min_value=df_plot.index.min().date(),
+            max_value=df_plot.index.max().date(),
+            key=f"{key_prefix}_{sensor_id}_date_range"
+        )
+    
+    with col2:
+        granularity = st.selectbox(
+            "Granularidad:",
+            options=['Horaria', 'Media Diaria', 'Media Semanal'],
+            index=1,  # Media Diaria por defecto
+            key=f"{key_prefix}_{sensor_id}_granularity"
+        )
+    
+    # Filtrar por fechas
+    start_date = pd.to_datetime(date_range[0])
+    end_date = pd.to_datetime(date_range[1]) + timedelta(days=1)
+    df_filtered = df_plot[(df_plot.index >= start_date) & (df_plot.index < end_date)]
+    
+    if not df_filtered.empty:
+        # Aplicar granularidad
+        if granularity == 'Media Diaria':
+            df_agg = df_filtered.resample('D').mean()
+            title_suffix = '(Media Diaria)'
+        elif granularity == 'Media Semanal':
+            df_agg = df_filtered.resample('W-MON').mean()
+            title_suffix = '(Media Semanal)'
+        else:
+            df_agg = df_filtered
+            title_suffix = '(Horario)'
+        
+        # Gráfico de predicciones vs reales
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+        
+        # Predicciones vs Reales
+        ax1.plot(df_agg.index, df_agg['no2_value'], label='Valor Real', 
+                alpha=0.8, linewidth=2, color='blue')
+        ax1.plot(df_agg.index, df_agg['Predicción'], label='Predicción XGBoost', 
+                linestyle='--', alpha=0.8, linewidth=2, color='red')
+        
+        ax1.set_title(f'Predicciones vs Reales - Sensor {sensor_id} {title_suffix}')
+        ax1.set_ylabel('Concentración NO₂ (µg/m³)')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Residuos
+        ax2.plot(df_agg.index, df_agg['Residuo'], alpha=0.8, linewidth=1.5, color='green')
+        ax2.axhline(0, color='red', linestyle='--', alpha=0.7, label='Error Cero')
+        ax2.set_title(f'Residuos Temporales - Sensor {sensor_id} {title_suffix}')
+        ax2.set_ylabel('Residuo (µg/m³)')
+        ax2.set_xlabel('Fecha')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # Formatear fechas en eje X
+        if granularity != 'Horaria':
+            for ax in [ax1, ax2]:
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        else:
+            for ax in [ax1, ax2]:
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+        
+        plt.setp([ax1, ax2], xticklabels=[])  # Ocultar etiquetas del primer gráfico
+        plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+    
+    # Análisis de distribución de errores para este sensor
+    st.markdown("### 📊 Distribución de Errores del Sensor")
+    
+    residuals = y_true - y_pred
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Histograma de residuos
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.histplot(residuals, kde=True, ax=ax, bins=30)
+        ax.set_title(f'Distribución de Residuos - Sensor {sensor_id}')
+        ax.set_xlabel('Residuo (Real - Predicción) [µg/m³]')
+        ax.set_ylabel('Frecuencia')
+        ax.axvline(0, color='red', linestyle='--', alpha=0.7, label='Error Cero')
+        ax.legend()
+        st.pyplot(fig)
+        plt.close()
+    
+    with col2:
+        # Scatter plot predicción vs real
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.scatter(y_true, y_pred, alpha=0.6, s=20)
+        
+        # Línea ideal (y=x)
+        min_val = min(y_true.min(), y_pred.min())
+        max_val = max(y_true.max(), y_pred.max())
+        ax.plot([min_val, max_val], [min_val, max_val], 'r--', alpha=0.8, label='Predicción Perfecta')
+        
+        ax.set_xlabel('Valor Real (µg/m³)')
+        ax.set_ylabel('Predicción (µg/m³)')
+        ax.set_title(f'Predicción vs Real - Sensor {sensor_id}')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig)
+        plt.close()
+    
+    # Estadísticas adicionales del sensor
+    st.markdown("### 📈 Estadísticas Adicionales del Sensor")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Media NO₂ Real", f"{y_true.mean():.2f} µg/m³")
+    with col2:
+        st.metric("Std NO₂ Real", f"{y_true.std():.2f} µg/m³")
+    with col3:
+        st.metric("Media Residuos", f"{residuals.mean():.3f} µg/m³")
+    with col4:
+        st.metric("Std Residuos", f"{residuals.std():.2f} µg/m³")
+    
+    # Análisis por hora del día para este sensor
+    if len(test_df) > 24:  # Solo si tenemos suficientes datos
+        st.markdown("### 🕐 Análisis por Hora del Día")
+        
+        test_df_copy = test_df.copy()
+        test_df_copy['hour'] = test_df_copy['fecha'].dt.hour
+        test_df_copy['prediction'] = y_pred
+        test_df_copy['residual'] = y_true - y_pred
+        
+        hourly_stats = test_df_copy.groupby('hour').agg({
+            'no2_value': ['mean', 'std', 'count'],
+            'prediction': ['mean', 'std'],
+            'residual': ['mean', 'std']
+        }).round(2)
+        
+        # Aplanar nombres de columnas
+        hourly_stats.columns = ['_'.join(col).strip() for col in hourly_stats.columns]
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        
+        # Valores por hora
+        hours = hourly_stats.index
+        ax1.plot(hours, hourly_stats['no2_value_mean'], 'o-', label='Real', linewidth=2)
+        ax1.plot(hours, hourly_stats['prediction_mean'], 's--', label='Predicción', linewidth=2)
+        ax1.fill_between(hours, 
+                       hourly_stats['no2_value_mean'] - hourly_stats['no2_value_std'],
+                       hourly_stats['no2_value_mean'] + hourly_stats['no2_value_std'],
+                       alpha=0.2, label='±1 Std Real')
+        ax1.set_xlabel('Hora del Día')
+        ax1.set_ylabel('NO₂ Promedio (µg/m³)')
+        ax1.set_title(f'Patrón Horario - Sensor {sensor_id}')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        ax1.set_xticks(range(0, 24, 2))
+        
+        # Residuos por hora
+        ax2.plot(hours, hourly_stats['residual_mean'], 'o-', color='green', linewidth=2)
+        ax2.fill_between(hours,
+                       hourly_stats['residual_mean'] - hourly_stats['residual_std'],
+                       hourly_stats['residual_mean'] + hourly_stats['residual_std'],
+                       alpha=0.2, color='green')
+        ax2.axhline(0, color='red', linestyle='--', alpha=0.7)
+        ax2.set_xlabel('Hora del Día')
+        ax2.set_ylabel('Residuo Promedio (µg/m³)')
+        ax2.set_title(f'Errores por Hora - Sensor {sensor_id}')
+        ax2.grid(True, alpha=0.3)
+        ax2.set_xticks(range(0, 24, 2))
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+        
+        # Mostrar tabla de estadísticas horarias
+        with st.expander(f"📋 Estadísticas Horarias Detalladas - Sensor {sensor_id}"):
+            st.dataframe(hourly_stats, use_container_width=True)
 
 
 # ==================== FUNCIÓN PRINCIPAL ====================
@@ -962,9 +1185,14 @@ def xgboost_training_page():
             show_residual_analysis(analysis_data['y_test'], analysis_data['metrics']['y_pred'])
         
         elif st.session_state.xgboost_analysis_tab == 1:
-            show_temporal_predictions(analysis_data['test_df'], analysis_data['metrics']['y_pred'])
+            show_temporal_predictions(analysis_data['test_df'], analysis_data['metrics']['y_pred'], f"training_{config_key}")
             st.divider()
-            show_residuals_over_time(analysis_data['test_df'], analysis_data['metrics']['y_pred'])
+            show_residuals_over_time(analysis_data['test_df'], analysis_data['metrics']['y_pred'], f"training_{config_key}")
+            
+            # Opción para análisis temporal detallado
+            st.divider()
+            if st.checkbox("📈 Mostrar Análisis Temporal Detallado", key=f"show_detailed_individual_analysis_{config_key}"):
+                show_detailed_individual_analysis(analysis_data['test_df'], analysis_data['metrics']['y_pred'], analysis_data['metrics'], sensor_seleccionado, f"training_{config_key}")
         
         elif st.session_state.xgboost_analysis_tab == 2:
             st.subheader("🎯 Importancia de Variables")

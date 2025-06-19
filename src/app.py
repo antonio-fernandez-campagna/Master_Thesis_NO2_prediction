@@ -26,6 +26,7 @@ from src.correlations_analysis import analisis_sensores
 from src.gam_training import training_page
 from src.xgboost_unified import xgboost_unified_page
 from src.bayesian_nowcasting import bayesian_nowcasting_page
+from src.models_comparison import models_comparison_page
 
 # ==================== CONFIGURACIÓN DE TABS CON FUNCIONES ====================
 
@@ -36,7 +37,8 @@ TAB_FUNCTIONS = {
     "Correlaciones": analisis_sensores,
     "Entrenamiento GAM": training_page,
     "XGBoost Unificado": xgboost_unified_page,
-    "Nowcasting Bayesiano": bayesian_nowcasting_page
+    "Nowcasting Bayesiano": bayesian_nowcasting_page,
+    "Comparación Modelos": models_comparison_page
 }
 
 # ==================== CLASE PRINCIPAL ====================

@@ -423,7 +423,7 @@ def show_feature_importance(model: xgb.XGBRegressor, feature_names: List[str]):
             st.dataframe(importance_df.sort_values('importance', ascending=False), use_container_width=True)
 
 
-def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
+def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray, key_prefix: str = "copy_default"):
     """Muestra gráficos temporales de predicciones vs valores reales."""
     df_plot = test_df[['fecha', 'no2_value']].copy()
     df_plot['Predicción'] = y_pred
@@ -440,7 +440,7 @@ def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
             value=(df_plot.index.min().date(), df_plot.index.max().date()),
             min_value=df_plot.index.min().date(),
             max_value=df_plot.index.max().date(),
-            key="temporal_predictions_date_range"
+            key=f"{key_prefix}_temporal_predictions_date_range"
         )
     
     with col2:
@@ -448,7 +448,7 @@ def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
             "Granularidad:",
             options=['Horaria', 'Media Diaria', 'Media Semanal'],
             index=0,
-            key="temporal_predictions_granularity"
+            key=f"{key_prefix}_temporal_predictions_granularity"
         )
     
     # Filtrar por fechas
@@ -493,7 +493,7 @@ def show_temporal_predictions(test_df: pd.DataFrame, y_pred: np.ndarray):
     plt.close()
 
 
-def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray):
+def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray, key_prefix: str = "copy_default"):
     """Muestra residuos a lo largo del tiempo."""
     df_plot = test_df[['fecha', 'no2_value']].copy()
     df_plot['Residuos'] = df_plot['no2_value'] - y_pred
@@ -510,7 +510,7 @@ def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray):
             value=(df_plot.index.min().date(), df_plot.index.max().date()),
             min_value=df_plot.index.min().date(),
             max_value=df_plot.index.max().date(),
-            key="residuals_over_time_date_range"
+            key=f"{key_prefix}_residuals_over_time_date_range"
         )
     
     with col2:
@@ -518,7 +518,7 @@ def show_residuals_over_time(test_df: pd.DataFrame, y_pred: np.ndarray):
             "Granularidad de errores:",
             options=['Horaria', 'Media Diaria', 'MAE Diario', 'Media Semanal'],
             index=0,
-            key="residuals_over_time_granularity"
+            key=f"{key_prefix}_residuals_over_time_granularity"
         )
     
     # Filtrar datos
@@ -962,9 +962,9 @@ def xgboost_training_page():
             show_residual_analysis(analysis_data['y_test'], analysis_data['metrics']['y_pred'])
         
         elif st.session_state.xgboost_analysis_tab == 1:
-            show_temporal_predictions(analysis_data['test_df'], analysis_data['metrics']['y_pred'])
+            show_temporal_predictions(analysis_data['test_df'], analysis_data['metrics']['y_pred'], key_prefix=config_key)
             st.divider()
-            show_residuals_over_time(analysis_data['test_df'], analysis_data['metrics']['y_pred'])
+            show_residuals_over_time(analysis_data['test_df'], analysis_data['metrics']['y_pred'], key_prefix=config_key)
         
         elif st.session_state.xgboost_analysis_tab == 2:
             st.subheader("🎯 Importancia de Variables")

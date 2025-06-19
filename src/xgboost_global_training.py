@@ -806,9 +806,9 @@ def xgboost_global_training_page():
             show_sensor_comparison(analysis_data['sensor_metrics'])
         
         elif st.session_state.xgboost_global_analysis_tab == 2:
-            show_temporal_predictions(analysis_data['test_df'], analysis_data['metrics']['y_pred'])
+            show_temporal_predictions(analysis_data['test_df'], analysis_data['metrics']['y_pred'], f"global_{config_key}")
             st.divider()
-            show_residuals_over_time(analysis_data['test_df'], analysis_data['metrics']['y_pred'])
+            show_residuals_over_time(analysis_data['test_df'], analysis_data['metrics']['y_pred'], f"global_{config_key}")
         
         elif st.session_state.xgboost_global_analysis_tab == 3:
             st.subheader("🎯 Importancia de Variables Global")

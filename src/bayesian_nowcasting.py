@@ -2285,14 +2285,14 @@ def show_global_bayesian_training(unified_nowcaster):
     
     
     # ==================== BOTONES DE ACCIÓN ====================
-    col1, col2 = st.columns(2)
+    #col1, col2 = st.columns(2)
     
-    with col1:
-        if st.button("Entrenar Modelo Bayesiano Global", type="primary", key="global_train_btn"):
-            train_global_bayesian_model(
-                unified_nowcaster, sensores_train, sensores_test, 
-                selected_features, model_type, fecha_division, training_config
-            )
+    #with col1:
+    if st.button("Entrenar Modelo Bayesiano Global", type="primary", key="global_train_btn"):
+        train_global_bayesian_model(
+            unified_nowcaster, sensores_train, sensores_test, 
+            selected_features, model_type, fecha_division, training_config
+        )
     
     # ==================== MOSTRAR RESULTADOS EXISTENTES ====================
     if 'global_bnn_model_results' in st.session_state:
@@ -2362,11 +2362,6 @@ def train_global_bayesian_model(unified_nowcaster, sensores_train, sensores_test
             st.error("❌ No hay datos suficientes después de la limpieza")
             return
         
-        st.write(f" **Datos preparados:**")
-        st.write(f"- Entrenamiento: {X_train.shape}")
-        st.write(f"- Evaluación: {X_test.shape}")
-        st.write(f"- Características: {len(selected_features)}")
-        
         # División de validación temporal (80% train, 20% val)
         val_split = int(0.8 * len(X_train))
         X_val = X_train[val_split:]
@@ -2384,29 +2379,12 @@ def train_global_bayesian_model(unified_nowcaster, sensores_train, sensores_test
         y_train_scaled = scaler_y.fit_transform(y_train.reshape(-1, 1)).flatten()  # FIT solo con entrenamiento
         y_val_scaled = scaler_y.transform(y_val.reshape(-1, 1)).flatten()          # TRANSFORM validación
         
-        st.write(f" **División final:**")
-        st.write(f"- Entrenamiento: {X_train_scaled.shape[0]} muestras")
-        st.write(f"- Validación: {X_val_scaled.shape[0]} muestras")
-        st.write(f"- Evaluación: {X_test_scaled.shape[0]} muestras")
-        
-        # AGREGAR: Información de escalado para debug
-        st.write(f"🔍 **Información de escalado:**")
-        st.write(f"- Scaler Y mean: {scaler_y.mean_[0]:.2f}")
-        st.write(f"- Scaler Y scale: {scaler_y.scale_[0]:.2f}")
-        st.write(f"- y_train original rango: [{y_train.min():.2f}, {y_train.max():.2f}]")
-        st.write(f"- y_test original rango: [{y_test.min():.2f}, {y_test.max():.2f}]")
-        st.write(f"- y_train_scaled rango: [{y_train_scaled.min():.3f}, {y_train_scaled.max():.3f}]")
-        
         # Crear y compilar modelo
         nowcaster = BayesianNowcaster()
         nowcaster.model = nowcaster.create_bayesian_model(X_train_scaled.shape[1], model_type)
         nowcaster.model = nowcaster.compile_model(nowcaster.model, learning_rate=training_config['learning_rate'])
         nowcaster.scaler_X = scaler_X
         nowcaster.scaler_y = scaler_y
-        
-        st.write(f"🧠 **Modelo creado:**")
-        st.write(f"- Arquitectura: {MODEL_CONFIGS[model_type]['name']}")
-        st.write(f"- Parámetros totales: {nowcaster.model.count_params():,}")
         
         # Entrenar modelo
         history = nowcaster.train_model(
